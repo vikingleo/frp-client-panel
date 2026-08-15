@@ -5,6 +5,7 @@ export interface ConnectionConfig {
   rpc_url: string;
   auto_connect: boolean;
   launch_at_login: boolean;
+  allow_insecure_tls: boolean;
 }
 
 export type RuntimeState = "stopped" | "starting" | "running" | "error";

@@ -1,0 +1,106 @@
+# 使用指南
+
+## 适用对象与前提
+
+本应用仅用于已经部署 `frp-panel` 服务端、并能从其 Web UI 获取 Client 启动命令的用户。它不是标准 frp 客户端的图形化编辑器，也不能直接管理普通 `frpc.toml`。
+
+安装前请准备：
+
+1. 与电脑架构匹配的安装包。
+2. frp-panel Web UI 生成的 Client 命令。
+3. 可访问的 API URL 与 RPC URL。
+4. 服务端的有效 TLS 证书；如使用自签名证书，需要理解并主动接受 TLS 例外风险。
+
+## 安装
+
+| 系统 | 交付物 | 安装方式 |
+| --- | --- | --- |
+| macOS Apple Silicon | `aarch64` DMG | 打开 DMG，将 App 拖到“应用程序”目录 |
+| macOS Intel | `x64` DMG | 打开 DMG，将 App 拖到“应用程序”目录 |
+| Linux x86_64 | AppImage | 赋予执行权限后运行；桌面集成因发行版而异 |
+| Windows x86_64 | NSIS EXE | 运行安装程序；应用和 sidecar 安装在当前用户目录 |
+
+macOS 未经 Developer ID 签名或 notarization 的测试包可能被 Gatekeeper 拦截；Windows 未签名的测试包可能触发 SmartScreen。只应从项目 Release 页面获取文件，并在发布者提供时校验 SHA256。
+
+## 配置连接
+
+### 方式一：粘贴 Client 启动命令
+
+在 frp-panel Web UI 中复制类似下方的命令：
+
+```bash
+frp-panel client -s <secret> -i <client-id> \
+  --api-url https://panel.example.com \
+  --rpc-url wss://panel.example.com
+```
+
+在应用“配置”页粘贴，点击“解析并填充”。应用只提取 Client ID、Secret、API URL 和 RPC URL，不会执行这条命令。
+
+### 方式二：粘贴 Linux 安装命令
+
+如果面板提供：
+
+```bash
+curl ... | bash -s -- client -s <secret> -i <client-id> ...
+```
+
+同样可以粘贴。应用会识别其中 `client` 后的参数，但**不会**下载脚本、执行 `curl`、运行 `bash` 或改动系统服务。
+
+### 连接与状态
+
+保存后点击“保存并连接”。启动成功后：
+
+1. 总览页显示“正在连接”或“已连接”。
+2. 日志页出现 sidecar 启动、注册、拉取配置等信息。
+3. 菜单栏/系统托盘可以显示窗口、连接、断开和退出。
+
+首次连接可能短暂出现“config is empty, wait for server init”。这表示 Master 尚未向此 Client 下发配置；它不是桌面应用安装失败。
+
+## 自动启动
+
+配置页提供两个独立开关：
+
+- **打开应用时自动连接**：启动桌面应用后立即拉起 Client。
+- **登录后启动应用**：使用当前系统的自动启动机制，使应用登录后常驻托盘。
+
+关闭第二个开关会移除应用设置的自动启动项，但不会改动你手工创建的其他系统服务。
+
+## TLS 证书与自签名部署
+
+默认情况下，应用要求 HTTPS / WSS 服务端证书可验证。推荐为 frp-panel 配置受信任证书和正确的域名。
+
+只有在确实使用自签名证书、且你已核对服务器指纹或可信网络边界时，才在“配置”页启用“允许不验证 TLS 证书”。启用后连接可能遭受中间人攻击，应视为临时兼容措施，而不是常规配置。
+
+## 凭据、日志和隐私
+
+- Client Secret 保存在系统凭据库，不保存在 `connections.json`。
+- Secret 不作为 sidecar 的命令行参数传递。
+- 当前会话日志保存在应用内存中，退出应用后不会由本应用持久化。
+- 应用不会上传遥测、分析或自动崩溃报告。
+
+在提交 issue 前，请删除日志中的 Client ID、域名、IP、端口和业务信息。详情见 [PRIVACY.md](../PRIVACY.md)。
+
+## 更新与卸载
+
+### 更新
+
+下载相同系统和架构的新版本后覆盖安装。首次启动时，应用会从旧 macOS Keychain service 迁移 Secret 到通用系统凭据 service；无需重新粘贴 Secret，除非凭据库条目已被删除。
+
+### 卸载
+
+- macOS：退出应用后删除“应用程序”中的 App；如不再需要连接信息，请在系统钥匙串中删除 `app.frppanel.client` / `client-secret`。
+- Linux：删除 AppImage；如不再需要连接信息，请在 Secret Service 和应用配置目录中移除相应条目。
+- Windows：在“已安装的应用”中卸载；如不再需要连接信息，请在 Windows Credential Manager 中删除对应凭据。
+
+## 排障
+
+| 现象 | 检查方式 |
+| --- | --- |
+| “内置 Client 不可用” | 确认安装包与系统架构一致；开发环境先运行 `pnpm sync:client` |
+| 证书错误 | 检查 API/RPC 域名、证书链、服务器时间；不要直接长期关闭校验 |
+| Client 已注册但没有隧道 | 在 frp-panel Web UI 检查该 Client 是否已分配配置 |
+| 保存后提示找不到 Secret | 重新粘贴命令并保存，确认系统凭据库可用 |
+| App 启动但不自动连接 | 分别检查“打开应用时自动连接”和“登录后启动应用”开关 |
+| Windows/macOS 拦截安装包 | 确认从官方 Release 下载并核验哈希；测试版未签名时可能出现系统警告 |
+
+仍无法解决时，按 [SUPPORT.md](../SUPPORT.md) 提供系统版本、CPU 架构、安装包类型和脱敏日志。

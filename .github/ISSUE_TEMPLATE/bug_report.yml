@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a reproducible problem without credentials or private server data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include Client Secrets, tokens, cookies, full production URLs, or private configuration.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS Apple Silicon
+        - macOS Intel
+        - Linux x86_64
+        - Windows x86_64
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: Provide a minimal, sanitized sequence.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove secrets, hostnames, IP addresses, and business data before submitting.
+  - type: checkbox
+    id: tls
+    attributes:
+      label: TLS confirmation
+      options:
+        - label: I did not disable TLS verification unless my deployment uses a self-signed certificate.
+          required: true

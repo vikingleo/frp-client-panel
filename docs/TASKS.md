@@ -54,7 +54,7 @@
 - [x] 添加 macOS CI：安装依赖、从上游源码构建 host sidecar、前端/Rust 验证。
 - [x] 添加 Apple Silicon 与 Intel 原生 Release draft 构建矩阵。
 - [x] 在 Intel 主机实际完成 x86_64 与 aarch64 `.app/.dmg` 构建。
-- [ ] 推送到 GitHub 仓库并执行一次云端 CI / Release 验证。
+- [x] 推送到 GitHub 仓库并执行一次云端 CI 验证。
 
 ## M7：安全与启动加固
 
@@ -80,7 +80,20 @@
 - [x] 使用跨平台 autostart Builder，保留 macOS LaunchAgent 配置。
 - [x] 添加 Linux AppImage 与 Windows NSIS EXE Tauri bundle 配置。
 - [x] 添加 macOS、Linux、Windows 原生 CI / Release 构建矩阵。
-- [ ] 在 GitHub Actions 实际完成一次 Linux AppImage 与 Windows NSIS EXE 云端构建验证。
+- [x] 在 GitHub Actions 实际完成一次 Linux AppImage 与 Windows NSIS EXE 云端构建验证。
+
+## M10：开源治理与安全发布
+
+- [x] 添加 AGPL-3.0-only 许可证、NOTICE 与第三方 sidecar 声明。
+- [x] 添加贡献、行为准则、安全、支持、隐私、用户和二次开发文档。
+- [x] 默认启用 TLS 证书校验，并让自签名证书例外显式可见。
+- [x] 将 Client Secret 从 sidecar 命令行参数迁移到子进程环境变量。
+- [x] 收紧 production CSP、关闭生产 devtools feature、禁止前端任意 sidecar 参数。
+- [x] 添加 Dependabot、JS/Rust 审计、许可证/来源检查和 CI artifact 上传流程。
+- [x] 为 Release 添加 SHA256、SBOM 与 provenance attestation 流程。
+- [ ] 在 GitHub Actions 验证新的安全 workflow 和 CI artifact 上传。
+- [ ] 以预发布 tag 验证一次 Draft Release 的校验和、SBOM 与 provenance。
+- [ ] 在配置 Apple Developer ID、notarization 和 Authenticode 凭据后完成一次签名 Release 演练。
 
 ## 当前限制
 

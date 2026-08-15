@@ -2,7 +2,7 @@
 
 ## 总览
 
-本项目是一个跨平台桌面壳，核心职责是可靠管理由官方 `frp-panel` 源码构建的目标平台 `frp-panel-client`。
+本项目是一个跨平台桌面壳，核心职责是可靠管理由上游 `frp-panel` 源码构建的目标平台 `frp-panel-client`。
 
 ```text
 Vue UI
@@ -34,12 +34,12 @@ frp-panel client -s <secret> -i <client-id> --api-url <url> --rpc-url <url>
 
 该进程会向 Master 拉配置，并响应面板的启动、停止、更新等控制。MoonProxy 没有这层 `frp-panel` Master 控制协议。
 
-## 为什么封装官方 Client
+## 为什么封装上游 Client
 
 封装官方 Client 源码构建物可以保持协议兼容，避免重新实现：
 
 - gRPC / WebSocket RPC 连接；
-- Master TLS 证书逻辑；
+- Master API / RPC 协议逻辑；
 - 动态配置拉取；
 - 多 server/client 关系；
 - 面板远程控制消息；
@@ -70,11 +70,27 @@ Tauri externalBin 使用基础名 `frp-panel-client`，构建或开发时实际�
 - `rpc_url`
 - `auto_connect`
 - `launch_at_login`
+- `allow_insecure_tls`
 
 语义：
 
 - `auto_connect` 决定应用启动后是否拉起 sidecar。
 - `launch_at_login` 由 Tauri autostart 插件同步为各系统的自动启动入口；它只决定应用是否随登录启动。
+- `allow_insecure_tls` 默认 `false`。仅为自签名证书部署提供显式例外；启动 sidecar 时映射为 `CLIENT_TLS_INSECURE_SKIP_VERIFY`。
+
+## Secret 与 TLS 传递
+
+桌面壳从面板命令提取 Secret，但不将它写入 Store，也不把它传为
+sidecar 的 `-s` 命令行参数。启动时由 Rust 后端设置：
+
+```text
+CLIENT_SECRET=<credential-store value>
+CLIENT_TLS_INSECURE_SKIP_VERIFY=false
+CLIENT_FEATURES_ENABLE_FUNCTIONS=false
+CLIENT_FEATURES_ENABLE_REMOTE_SHELL=false
+```
+
+其中 TLS 跳过校验只会在用户明确启用自签名证书例外时变为 `true`。
 
 ## 状态推导
 
@@ -101,7 +117,7 @@ Tauri externalBin 使用基础名 `frp-panel-client`，构建或开发时实际�
 ## 前端权限边界
 
 - CSP 在 production 环境中只允许本地资源与 Tauri IPC；开发环境额外允许 Vite HMR。
-- Capability 只允许窗口管理、autostart 和受限的 `frp-panel-client` sidecar 启停；未授予外部 URL/文件打开或前端 Store 读写权限。
+- Capability 只允许窗口管理、autostart 和受限的 `frp-panel-client` sidecar 启停；前端不能直接向 sidecar 传递任意参数，参数由 Rust 后端构造。未授予外部 URL/文件打开或前端 Store 读写权限。
 
 ## 后续增强路线
 

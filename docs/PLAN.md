@@ -2,7 +2,7 @@
 
 ## 目标
 
-开发一个面向 macOS、Linux 与 Windows 的 `frp-panel` 图形客户端，提供托盘常驻和桌面主窗口。客户端不重写 `frp-panel` 协议，通过 Tauri sidecar 管理官方、目标平台的 `frp-panel-client` 二进制，执行面板生成的 `client -s ... -i ... --api-url ... --rpc-url ...` 连接命令。
+开发一个面向 macOS、Linux 与 Windows 的 `frp-panel` 图形客户端，提供托盘常驻和桌面主窗口。客户端不重写 `frp-panel` 协议，通过 Tauri sidecar 管理上游、目标平台的 `frp-panel-client` 二进制。应用解析面板生成的 `client -s ... -i ... --api-url ... --rpc-url ...` 命令，但运行时将 Secret 通过环境变量传递，避免出现在进程参数中。
 
 ## 非目标
 
@@ -32,8 +32,9 @@
 4. 点击连接后，Rust 后端启动内置 sidecar：
 
    ```bash
+   CLIENT_SECRET=<client_secret> \
+   CLIENT_TLS_INSECURE_SKIP_VERIFY=false \
    frp-panel-client client \
-     -s <client_secret> \
      -i <client_id> \
      --api-url <api_url> \
      --rpc-url <rpc_url>
@@ -57,6 +58,8 @@
 - 首次加载旧版本明文 `connections.json` 时，将 Secret 迁移到系统凭据库并清理原字段；凭据库写入失败时不回退到明文存储。
 - UI 默认隐藏 secret。
 - 日志展示会对当前 secret 做脱敏。
+- Secret 通过 `CLIENT_SECRET` 环境变量传给 sidecar，不作为命令行参数。
+- TLS 证书校验默认开启；自签名证书例外仅由用户显式启用。
 - 第一版不请求 sudo、不写 `/etc/frpp/.env`。
 - 默认注入环境变量关闭非核心能力：
   - `CLIENT_FEATURES_ENABLE_FUNCTIONS=false`
@@ -66,6 +69,13 @@
 
 - `auto_connect`：打开应用后自动启动 sidecar。
 - `launch_at_login`：使用系统自动启动入口在用户登录后启动应用；只有同时启用 `auto_connect` 时，登录启动后才会自动连接。
+
+## 开源与发布基线
+
+- 根目录使用 AGPL-3.0-only，并由 `NOTICE` 和 `THIRD_PARTY_NOTICES.md` 记录上游 sidecar 的来源、固定 commit 和许可证。
+- CI 固定 Actions 和工具链版本，执行四平台 bundle 验证并保留 workflow artifact。
+- 依赖更新由 Dependabot、JS/Rust 审计和 Rust 许可证/来源检查覆盖。
+- Release workflow 生成 SHA256、SPDX SBOM 和 provenance attestation；正式分发仍需配置 Apple notarization 与 Windows Authenticode。
 
 ## UI 信息架构
 

@@ -2,6 +2,21 @@
   "name": "frp-panel-desktop-client",
   "private": true,
   "version": "0.1.0",
+  "description": "Cross-platform desktop and tray client for frp-panel managed clients",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/vikingleo/frp-client-panel#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/vikingleo/frp-client-panel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vikingleo/frp-client-panel/issues"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=22.18.0 <23",
+    "pnpm": ">=10.15.1 <11"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +26,8 @@
     "sync:client": "bash scripts/sync-frp-panel-client.sh",
     "verify:client": "bash scripts/verify-frp-panel-client.sh",
     "verify:bundle": "bash scripts/verify-bundle-artifact.sh",
+    "checksums": "node scripts/generate-checksums.mjs",
+    "audit:js": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org",
     "bundle:mac": "env PATH=\"/usr/bin:$PATH\" pnpm tauri build --bundles app,dmg",
     "bundle:linux": "pnpm tauri build --bundles appimage",
     "bundle:windows": "pnpm tauri build --bundles nsis"

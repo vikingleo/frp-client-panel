@@ -32,7 +32,7 @@
         "font-src": "'self' data:",
         "img-src": "'self' asset: http://asset.localhost blob: data:",
         "script-src": "'self'",
-        "style-src": "'self' 'unsafe-inline'"
+        "style-src": "'self'"
       },
       "devCsp": {
         "default-src": "'self' http://localhost:1420 http://127.0.0.1:1420 customprotocol: asset:",

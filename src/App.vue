@@ -258,6 +258,7 @@ async function parseCommand() {
       ...parsed,
       auto_connect: config.value.auto_connect,
       launch_at_login: config.value.launch_at_login,
+      allow_insecure_tls: config.value.allow_insecure_tls,
     };
     setNotice(
       "success",
@@ -754,10 +755,18 @@ watch(themePreference, (preference) => {
                     <small>使用当前系统的自动启动机制常驻托盘</small>
                   </span>
                 </label>
+                <label class="toggle-row">
+                  <input v-model="config.allow_insecure_tls" type="checkbox" />
+                  <span class="toggle-control" aria-hidden="true"><span></span></span>
+                  <span>
+                    <strong>允许不验证 TLS 证书</strong>
+                    <small>仅适用于自签名证书；启用后 HTTPS / WSS 连接可能遭受中间人攻击</small>
+                  </span>
+                </label>
               </div>
               <div class="credential-note">
                 <i class="bi bi-shield-lock" aria-hidden="true"></i>
-                Secret 保存于系统凭据库，日志由后端脱敏
+                Secret 保存于系统凭据库，并通过进程环境变量传递；日志由后端脱敏
               </div>
             </div>
 
@@ -885,8 +894,9 @@ watch(themePreference, (preference) => {
             </div>
             <div class="security-grid">
               <div><i class="bi bi-check2-circle" aria-hidden="true"></i><span>Client Secret 保存于系统凭据库</span></div>
-              <div><i class="bi bi-check2-circle" aria-hidden="true"></i><span>运行日志由 Rust 后端脱敏</span></div>
+              <div><i class="bi bi-check2-circle" aria-hidden="true"></i><span>Secret 不进入 sidecar 命令行，运行日志由 Rust 后端脱敏</span></div>
               <div><i class="bi bi-check2-circle" aria-hidden="true"></i><span>附加能力默认关闭</span></div>
+              <div><i class="bi bi-check2-circle" aria-hidden="true"></i><span>TLS 证书默认校验；自签名证书需明确启用例外</span></div>
             </div>
           </section>
         </section>

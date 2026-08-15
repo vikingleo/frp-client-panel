@@ -9,6 +9,8 @@ pub struct ConnectionConfig {
     pub auto_connect: bool,
     #[serde(default)]
     pub launch_at_login: bool,
+    #[serde(default)]
+    pub allow_insecure_tls: bool,
 }
 
 impl ConnectionConfig {

@@ -26,19 +26,9 @@ pub async fn start_client_inner(
         }
     }
 
-    let args = vec![
-        "client".to_string(),
-        "-s".to_string(),
-        config.client_secret.clone(),
-        "-i".to_string(),
-        config.client_id.clone(),
-        "--api-url".to_string(),
-        config.api_url.clone(),
-        "--rpc-url".to_string(),
-        config.rpc_url.clone(),
-    ];
+    let args = client_args(&config);
 
-    let command = sidecar_command(&app, args)?;
+    let command = sidecar_command(&app, args, &config.client_secret, config.allow_insecure_tls)?;
     let (mut rx, child) = command
         .spawn()
         .map_err(|e| format!("启动 frp-panel-client 失败：{e}"))?;
@@ -130,6 +120,42 @@ pub async fn start_client_inner(
     });
 
     Ok(())
+}
+
+fn client_args(config: &ConnectionConfig) -> Vec<String> {
+    vec![
+        "client".to_string(),
+        "-i".to_string(),
+        config.client_id.clone(),
+        "--api-url".to_string(),
+        config.api_url.clone(),
+        "--rpc-url".to_string(),
+        config.rpc_url.clone(),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::client_args;
+    use crate::types::ConnectionConfig;
+
+    #[test]
+    fn client_secret_is_not_part_of_sidecar_arguments() {
+        let config = ConnectionConfig {
+            client_id: "user.c.macos".into(),
+            client_secret: "must-not-be-an-argument".into(),
+            api_url: "https://panel.example.com".into(),
+            rpc_url: "wss://panel.example.com".into(),
+            auto_connect: false,
+            launch_at_login: false,
+            allow_insecure_tls: false,
+        };
+
+        let args = client_args(&config);
+
+        assert!(!args.iter().any(|arg| arg == "-s" || arg == "--secret"));
+        assert!(!args.iter().any(|arg| arg == "must-not-be-an-argument"));
+    }
 }
 
 #[tauri::command]

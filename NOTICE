@@ -1,0 +1,9 @@
+frp-panel Client
+Copyright (c) 2026 vikingleo and contributors
+
+This repository's original source code is licensed under GNU Affero General
+Public License, version 3. See LICENSE for the full license text.
+
+This project bundles the frp-panel-client sidecar built from the upstream
+VaalaCat/frp-panel project. See THIRD_PARTY_NOTICES.md for the upstream source
+revision, license, and source-availability information.

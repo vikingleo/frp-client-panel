@@ -9,6 +9,7 @@ export const emptyConfig = (): ConnectionConfig => ({
   rpc_url: "",
   auto_connect: false,
   launch_at_login: false,
+  allow_insecure_tls: false,
 });
 
 export function loadConnection() {

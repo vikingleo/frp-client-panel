@@ -71,15 +71,49 @@ pub fn get_sidecar_info(app: AppHandle) -> SidecarInfo {
 pub fn sidecar_command(
     app: &AppHandle,
     args: Vec<String>,
+    client_secret: &str,
+    allow_insecure_tls: bool,
 ) -> Result<tauri_plugin_shell::process::Command, String> {
     app.shell()
         .sidecar("frp-panel-client")
         .map_err(|e| format!("{} 原始错误：{e}", missing_sidecar_hint()))
         .map(|cmd| {
             cmd.args(args)
+                // Keep the Client Secret out of the process argument list. The upstream client
+                // reads this same value from CLIENT_SECRET through its runtime environment.
+                .env("CLIENT_SECRET", client_secret)
+                // Certificate verification is mandatory by default. Self-signed deployments must
+                // be explicitly acknowledged in the desktop configuration.
+                .env(
+                    "CLIENT_TLS_INSECURE_SKIP_VERIFY",
+                    tls_skip_verify_value(allow_insecure_tls),
+                )
                 .env("CLIENT_FEATURES_ENABLE_FUNCTIONS", "false")
                 .env("CLIENT_FEATURES_ENABLE_REMOTE_SHELL", "false")
                 .env("LOGGER_FRP_LOGGER_LEVEL", "info")
                 .env("LOGGER_DEFAULT_LOGGER_LEVEL", "info")
         })
+}
+
+fn tls_skip_verify_value(allow_insecure_tls: bool) -> &'static str {
+    if allow_insecure_tls {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tls_skip_verify_value;
+
+    #[test]
+    fn tls_verification_is_enabled_by_default() {
+        assert_eq!(tls_skip_verify_value(false), "false");
+    }
+
+    #[test]
+    fn tls_exception_requires_explicit_opt_in() {
+        assert_eq!(tls_skip_verify_value(true), "true");
+    }
 }

@@ -66,6 +66,7 @@ pub fn parse_panel_command_inner(command: &str) -> Result<ConnectionConfig, Stri
         rpc_url,
         auto_connect: false,
         launch_at_login: false,
+        allow_insecure_tls: false,
     };
     config.validate()?;
     Ok(config)
@@ -140,6 +141,7 @@ mod tests {
         assert_eq!(cfg.client_id, "user.c.mac");
         assert_eq!(cfg.api_url, "https://example.com");
         assert_eq!(cfg.rpc_url, "wss://example.com");
+        assert!(!cfg.allow_insecure_tls);
     }
 
     #[test]

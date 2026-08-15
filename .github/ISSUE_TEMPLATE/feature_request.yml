@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a user-focused improvement.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      placeholder: Describe the user problem, not only a proposed implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Potential impact
+      options:
+        - label: This may affect Client Secret handling, TLS behavior, sidecar execution, or Tauri permissions.
+        - label: I checked that this does not require executing a user-provided shell command.

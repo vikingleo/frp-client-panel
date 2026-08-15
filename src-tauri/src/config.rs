@@ -24,6 +24,8 @@ struct StoredConnectionConfig {
     auto_connect: bool,
     #[serde(default)]
     launch_at_login: bool,
+    #[serde(default)]
+    allow_insecure_tls: bool,
 }
 
 impl From<&ConnectionConfig> for StoredConnectionConfig {
@@ -35,6 +37,7 @@ impl From<&ConnectionConfig> for StoredConnectionConfig {
             rpc_url: config.rpc_url.clone(),
             auto_connect: config.auto_connect,
             launch_at_login: config.launch_at_login,
+            allow_insecure_tls: config.allow_insecure_tls,
         }
     }
 }
@@ -54,6 +57,7 @@ impl StoredConnectionConfig {
             rpc_url: self.rpc_url.clone(),
             auto_connect: self.auto_connect,
             launch_at_login: self.launch_at_login,
+            allow_insecure_tls: self.allow_insecure_tls,
         }
     }
 }
@@ -213,6 +217,7 @@ fn normalize_config(config: &ConnectionConfig) -> ConnectionConfig {
         rpc_url: config.rpc_url.trim().to_string(),
         auto_connect: config.auto_connect,
         launch_at_login: config.launch_at_login,
+        allow_insecure_tls: config.allow_insecure_tls,
     }
 }
 
@@ -270,6 +275,7 @@ mod tests {
             rpc_url: "wss://panel.example.com/rpc".into(),
             auto_connect: true,
             launch_at_login: true,
+            allow_insecure_tls: false,
         }
     }
 
@@ -282,11 +288,18 @@ mod tests {
             rpc_url: "wss://panel.example.com/rpc".into(),
             auto_connect: true,
             launch_at_login: true,
+            allow_insecure_tls: false,
         };
 
         let value = serde_json::to_value(StoredConnectionConfig::from(&config)).unwrap();
 
         assert!(value.get("client_secret").is_none());
+        assert_eq!(
+            value
+                .get("allow_insecure_tls")
+                .and_then(|value| value.as_bool()),
+            Some(false)
+        );
         assert_eq!(KEYRING_SERVICE, "app.frppanel.client");
         assert_eq!(KEYRING_ACCOUNT, "client-secret");
     }
