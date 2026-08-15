@@ -8,6 +8,9 @@
 4. 已审阅 `CHANGELOG.md`、许可证和第三方声明。
 5. 已完成依赖漏洞扫描和 SBOM 生成。
 6. macOS Developer ID / notarization 与 Windows Authenticode 签名材料只保存在 GitHub Secrets 或受保护环境中。
+7. 没有未记录的 Dependabot medium/high 告警；如因上游兼容限制无法立即修复，
+   必须在 `docs/DEPENDENCY_RISKS.md` 中保留范围、缓解措施和复核日期，并在
+   Draft Release 审查中明确确认该例外。
 
 ## 发布步骤
 
