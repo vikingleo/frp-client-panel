@@ -86,7 +86,7 @@ build_from_source() {
     exit 1
   fi
   if ! command -v go >/dev/null 2>&1; then
-    printf 'Go 1.24+ is required to build the frp-panel-client sidecar from source.\n' >&2
+    printf 'Go 1.25+ is required to build the frp-panel-client sidecar from source.\n' >&2
     exit 1
   fi
 

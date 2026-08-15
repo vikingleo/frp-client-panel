@@ -55,7 +55,7 @@ Linux AppImage 是单文件可执行交付物。Windows 交付物是单个 `.exe
 
 - Node.js 20+ 与 pnpm 10+。
 - Rust stable toolchain。
-- Go 1.24+，仅用于开发、构建或重新同步 sidecar。
+- Go 1.25+，仅用于开发、构建或重新同步 sidecar；Go 1.24 构建的 macOS Intel sidecar 已知会在启动时崩溃。
 - Linux 打包额外需要 WebKitGTK 4.1、GTK 3、AppIndicator、librsvg 与 `patchelf`；CI 会自动安装。
 - 一个已部署的 `frp-panel` 实例与从其 Web UI 复制的 Client 命令。
 
