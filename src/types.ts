@@ -82,6 +82,52 @@ export interface ServerRuntimeStatus {
   config_path: string | null;
 }
 
+export interface ServerDashboardStatus {
+  available: boolean;
+  endpoint: string | null;
+  version: string | null;
+  total_traffic_in: number;
+  total_traffic_out: number;
+  current_connections: number;
+  client_counts: number;
+  online_clients: number;
+  proxy_counts: number;
+  online_proxies: number;
+  clients: ServerDashboardClient[];
+  proxies: ServerDashboardProxy[];
+  refreshed_at_ms: number;
+  error: string | null;
+}
+
+export interface ServerDashboardClient {
+  key: string;
+  user: string;
+  client_id: string;
+  run_id: string;
+  version: string;
+  hostname: string;
+  client_ip: string;
+  first_connected_at: number;
+  last_connected_at: number;
+  disconnected_at: number;
+  online: boolean;
+}
+
+export interface ServerDashboardProxy {
+  name: string;
+  user: string;
+  client_id: string;
+  proxy_type: string;
+  state: string;
+  today_traffic_in: number;
+  today_traffic_out: number;
+  current_connections: number;
+  last_start_at: number;
+  last_close_at: number;
+  remote_port: number | null;
+  domains: string[];
+}
+
 export interface LogEntry {
   stream: "stdout" | "stderr" | "system";
   line: string;

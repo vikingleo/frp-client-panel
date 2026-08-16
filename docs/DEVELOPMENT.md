@@ -11,6 +11,9 @@ Rust application layer
   ├─ command_parser.rs  仅解析粘贴命令，不执行 shell
   ├─ discovery.rs       只读发现外部二进制、运行进程与启动项
   ├─ process.rs         受控启动/停止 panel/frpc sidecar、日志脱敏与 native verify
+  ├─ server_config.rs   本机 frps Server Profile 与私有 TOML
+  ├─ server_process.rs  受控启动/停止 frps、日志脱敏与 native verify
+  ├─ server_dashboard.rs 本机托管 Dashboard 的只读状态查询
   ├─ runtime.rs         进程状态和日志环形缓冲
   ├─ sidecar.rs         平台二进制选择、panel 安全环境变量与 frpc sidecar
   └─ tray.rs            系统托盘
@@ -46,6 +49,7 @@ cd frp-client-panel
 pnpm install --frozen-lockfile
 pnpm sync:client
 pnpm sync:frpc
+pnpm sync:frps
 pnpm tauri dev
 ```
 
@@ -60,6 +64,8 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
 # 官方原生 frpc 目前仅随 macOS bundle 提供
 FRP_PANEL_TARGET_TRIPLE=aarch64-apple-darwin pnpm sync:frpc
 FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frpc
+FRP_PANEL_TARGET_TRIPLE=aarch64-apple-darwin pnpm sync:frps
+FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frps
 ```
 
 构建脚本固定上游 commit `1a58b856d7de19de8669b7072872986d2fa1604a`。更新上游版本时，必须在原生 macOS Intel、macOS Apple Silicon、Linux x86_64 和 Windows x86_64 runner 上重新验证。
@@ -75,6 +81,7 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frpc
 | 解析面板命令 | `src-tauri/src/command_parser.rs` |
 | 探测外部命令行 Client / LaunchAgent | `src-tauri/src/discovery.rs` |
 | 启动、停止和脱敏 | `src-tauri/src/process.rs` |
+| 本机 frps 配置、生命周期和 Dashboard | `src-tauri/src/server_config.rs`、`src-tauri/src/server_process.rs`、`src-tauri/src/server_dashboard.rs` |
 | Profile 迁移、Keychain 与托管 TOML | `src-tauri/src/config.rs` |
 | sidecar / 环境变量 / 目标架构 | `src-tauri/src/sidecar.rs` |
 | 运行时状态和日志 | `src-tauri/src/runtime.rs` |

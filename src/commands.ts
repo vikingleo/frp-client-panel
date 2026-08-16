@@ -10,6 +10,7 @@ import type {
   RuntimeStatus,
   ServerProfile,
   ServerProfileSummary,
+  ServerDashboardStatus,
   ServerRuntimeStatus,
   SidecarInfo,
 } from "./types";
@@ -149,6 +150,10 @@ export function getServerLogs() {
 
 export function clearServerLogs() {
   return invoke<void>("clear_server_logs");
+}
+
+export function getServerDashboardStatus() {
+  return invoke<ServerDashboardStatus>("get_server_dashboard_status");
 }
 
 export function errorMessage(error: unknown): string {

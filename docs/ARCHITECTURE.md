@@ -13,6 +13,7 @@ Rust 后端
   ├─ command_parser：解析 frp-panel 连接命令
   ├─ discovery：外部进程、二进制、LaunchAgent 的只读发现
   ├─ process / server_process：客户端与本机服务端的 verify、启动/停止、日志与运行状态
+  ├─ server_dashboard：本机托管 frps 的 Dashboard 只读查询与响应最小化映射
   ├─ tray：系统托盘
   └─ sidecar：目标架构与受限二进制执行
       ├─ frp-panel-client → API/RPC → frp-panel Master
@@ -81,11 +82,13 @@ macOS 原生 `frpc` / `frps` 由 `scripts/sync-frpc.sh` / `scripts/sync-frps.sh`
 - 面板 Client Secret 保存在系统凭据库，Rust 通过 `CLIENT_SECRET` 环境变量传给 sidecar，不出现在命令行或 `connections.json`/`profiles.json`。
 - App 托管的 `frpc.toml` 与 `frps.toml` 使用应用私有目录并在 Unix 上设为 `0600`。TOML 可能含 `auth.token`、Dashboard 密码或 OIDC Secret，用户不应将其提交、上传或分享。
 - 外部 native TOML 不读取、不复制、不写入。
+- Dashboard 查询仅读取 App 托管的 `frps.toml`，并在 Rust 后端使用 `webServer` Basic Auth；密码不会返回给 Vue、不会持久化到普通 JSON，也不会进入日志。HTTP 重定向被拒绝，HTTPS 保持证书验证。
+- Dashboard 响应只映射客户端、代理、端口、连接数和流量等运行状态；不向 UI 返回完整 proxy spec、annotations 或 metadata，避免意外显示用户放入其中的敏感内容。
 - native 校验和运行日志对包含 `auth.token`、password、secret、plugin token 等典型配置行脱敏；分享日志前仍应人工检查主机、域名、端口与业务信息。
 
 ## 状态与托盘
 
-客户端与服务端各自有独立的进程句柄和运行状态。面板 Client 还会基于其日志把状态从 `starting` 提升为 `running`；原生 frpc 与 frps 的 child 成功 spawn 后分别显示为“frpc 运行中”和“frps 运行中”。未启用 `webServer` 时，App 不会把进程运行误称为每个 proxy 均已连接。
+客户端与服务端各自有独立的进程句柄和运行状态。面板 Client 还会基于其日志把状态从 `starting` 提升为 `running`；原生 frpc 与 frps 的 child 成功 spawn 后分别显示为“frpc 运行中”和“frps 运行中”。App 托管的 frps 启用 `webServer` 后，Server 页面通过官方 v2 Dashboard 的只读接口展示实际客户端与代理状态；未启用 `webServer` 时，App 不会把进程运行误称为每个 proxy 均已连接。
 
 窗口关闭默认隐藏到托盘。退出 App 时只停止 App 自己创建的 child，外部 Client/LaunchAgent 不受影响。
 
@@ -97,8 +100,8 @@ macOS 原生 `frpc` / `frps` 由 `scripts/sync-frpc.sh` / `scripts/sync-frps.sh`
 
 ## 后续路线
 
-1. 对用户明确启用的 native `webServer` 做安全的代理级状态读取。
-2. 扩展可视化配置到 STCP、XTCP、SUDP、visitor 和 plugin。
-3. 对未支持 TOML 字段实现完整 round-trip 保留。
-4. 支持多面板 Profile 的独立 Keychain 账户。
-5. 支持菜单栏 popover 小窗。
+1. 扩展可视化配置到 STCP、XTCP、SUDP、visitor 和 plugin。
+2. 对未支持 TOML 字段实现完整 round-trip 保留。
+3. 支持多面板 Profile 的独立 Keychain 账户。
+4. 支持菜单栏 popover 小窗。
+5. 如果引入显式的 Agent / OIDC 授权模型，再设计逐客户端授权、吊销或远程配置；不把共享 Token 当作逐客户端控制机制。

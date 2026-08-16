@@ -1,0 +1,14 @@
+serverAddr = "127.0.0.1"
+serverPort = 17001
+loginFailExit = false
+
+[auth]
+method = "token"
+token = "local-dashboard-token"
+
+[[proxies]]
+name = "dashboard-test"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 9
+remotePort = 17002

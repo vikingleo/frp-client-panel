@@ -43,7 +43,9 @@ The desktop shell depends on Tauri, Vue, Rust crates, npm packages, and native
 system libraries. Their exact versions and licenses are recorded in
 `src-tauri/Cargo.lock` and `pnpm-lock.yaml`. Release automation should generate
 an SPDX or CycloneDX SBOM so each published artifact carries a complete,
-machine-readable dependency inventory.
+machine-readable dependency inventory. The Dashboard read-only client uses
+`reqwest` with `rustls`; its transitive `webpki-roots` dependency is licensed
+under CDLA-Permissive-2.0 and is explicitly allowed in `deny.toml`.
 
 ## Trademark and affiliation notice
 

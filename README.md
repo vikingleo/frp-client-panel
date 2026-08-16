@@ -39,7 +39,7 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 
 从本版本起，本应用也可作为标准 `frpc` 的 macOS 运行壳：导入或生成 App 托管的 `frpc.toml`，启动前执行 `frpc verify -c`，再使用官方 sidecar 执行 `frpc -c`。此模式直接连接配置中的 `frps`，**不会**连接或使用 frp-panel Master RPC。
 
-macOS 还可以直接作为 `frps` 宿主：在“本机 frps”页面导入或生成 `frps.toml`，先执行 `frps verify -c` 再启动 `frps -c`。页面可生成其他设备的基础 `frpc.toml` 接入配置。该配置负责客户端接入地址、Token 与 TLS；每台客户端自己的 `[[proxies]]` 仍由其客户端配置决定。
+macOS 还可以直接作为 `frps` 宿主：在“本机 frps”页面导入或生成 `frps.toml`，先执行 `frps verify -c` 再启动 `frps -c`。页面可生成其他设备的基础 `frpc.toml` 接入配置，并通过本机托管 Dashboard 的只读 API 展示已连接客户端、代理在线状态和流量概览。该配置负责客户端接入地址、Token 与 TLS；每台客户端自己的 `[[proxies]]` 仍由其客户端配置决定。
 
 ## 功能范围
 
@@ -47,6 +47,7 @@ macOS 还可以直接作为 `frps` 宿主：在“本机 frps”页面导入或�
 - 保存并切换多个 Profile：frp-panel 受管 Profile 与原生 `frpc` Profile 分离。
 - macOS 原生 `frpc`：导入 TOML 到应用私有目录、启动前校验、启动/停止、日志与状态栏控制。
 - macOS 本机 `frps`：独立 Server Profile、导入/编辑/生成 `frps.toml`、启动前校验、启动/停止、服务端日志与托盘控制。
+- Dashboard 概览：只读显示本机托管 `frps` 的在线客户端、代理状态、连接数和流量；默认每 10 秒刷新，也可手动刷新。
 - 生成给其他设备使用的基础 `frpc.toml` 接入配置，包含服务端地址、端口和 Token，不执行远程命令或接管其他客户端。
 - 原生模式提供 TCP、UDP、HTTP、HTTPS 的单代理 TOML 起始配置生成器；高级字段保留在 TOML 编辑器中。
 - 在系统托盘常驻，支持登录后启动应用。
@@ -57,7 +58,7 @@ macOS 还可以直接作为 `frps` 宿主：在“本机 frps”页面导入或�
 - 默认校验 HTTPS / WSS 证书；自签名证书只能由用户明确启用例外。
 - 默认禁用上游 sidecar 的 functions 与 remote shell 功能。
 
-不包含：逐客户端远程配置下发或吊销、join-token 自动注册、完整的所有 frp proxy/plugin/visitor 图形表单、外部 `frpc` 接管/重载、worker/remote shell/WireGuard 专用图形配置。
+不包含：逐客户端远程配置下发或吊销、join-token 自动注册、完整的所有 frp proxy/plugin/visitor 图形表单、外部 `frpc` 接管/重载、worker/remote shell/WireGuard 专用图形配置。Dashboard 数据只读，不会向其他设备执行命令或改写其配置。
 
 ## 快速开始
 

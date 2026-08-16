@@ -5,6 +5,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import {
   clearServerLogs,
   deleteServerProfile,
+  getServerDashboardStatus,
   getServerLogs,
   getServerStatus,
   getSidecarInfo,
@@ -22,6 +23,7 @@ import type {
   NativeFrpsConfig,
   ServerProfile,
   ServerProfileSummary,
+  ServerDashboardStatus,
   ServerRuntimeStatus,
   SidecarInfo,
 } from "../types";
@@ -46,6 +48,23 @@ const emptyStatus = (): ServerRuntimeStatus => ({
   config_path: null,
 });
 
+const emptyDashboard = (): ServerDashboardStatus => ({
+  available: false,
+  endpoint: null,
+  version: null,
+  total_traffic_in: 0,
+  total_traffic_out: 0,
+  current_connections: 0,
+  client_counts: 0,
+  online_clients: 0,
+  proxy_counts: 0,
+  online_proxies: 0,
+  clients: [],
+  proxies: [],
+  refreshed_at_ms: 0,
+  error: null,
+});
+
 const profiles = ref<ServerProfileSummary[]>([]);
 const activeProfile = ref<ServerProfile | null>(null);
 const profileName = ref("本机 frps");
@@ -54,10 +73,12 @@ const serverToml = ref("");
 const importedName = ref("");
 const status = ref<ServerRuntimeStatus>(emptyStatus());
 const logs = ref<LogEntry[]>([]);
+const dashboard = ref<ServerDashboardStatus>(emptyDashboard());
 const sidecar = ref<SidecarInfo | null>(null);
 const busy = ref<"loading" | "saving" | "starting" | "stopping" | null>(null);
 const notice = ref<{ kind: NoticeKind; message: string } | null>(null);
 const unlisteners: UnlistenFn[] = [];
+let dashboardTimer: ReturnType<typeof setInterval> | null = null;
 const serverForm = ref({
   bindAddr: "0.0.0.0",
   bindPort: "7000",
@@ -113,13 +134,19 @@ function applyProfile(profile: ServerProfile | null) {
     profileName.value = "本机 frps";
     nativeConfig.value = emptyNative();
     serverToml.value = "";
+    dashboard.value = emptyDashboard();
     return;
   }
   profileName.value = profile.name;
   nativeConfig.value = profile.native;
   if (profile.native.source !== "managed") {
     serverToml.value = "";
+    dashboard.value = emptyDashboard();
   }
+}
+
+async function refreshDashboard() {
+  dashboard.value = await getServerDashboardStatus();
 }
 
 async function hydrate(profileId?: string) {
@@ -143,6 +170,7 @@ async function hydrate(profileId?: string) {
       setNotice("error", errorMessage(error));
     }
   }
+  await refreshDashboard();
 }
 
 async function chooseProfile(profileId: string) {
@@ -162,6 +190,7 @@ function createProfile() {
   nativeConfig.value = emptyNative();
   serverToml.value = "";
   importedName.value = "";
+  dashboard.value = emptyDashboard();
   clearNotice();
 }
 
@@ -254,6 +283,7 @@ async function start() {
     await save(false);
     await startServerProfile(activeProfile.value?.id);
     status.value = await getServerStatus();
+    await refreshDashboard();
     setNotice("success", "frps 已启动；其他客户端现在可以按接入配置连接");
   } catch (error) {
     setNotice("error", errorMessage(error));
@@ -267,6 +297,7 @@ async function stop() {
   try {
     await stopServer();
     status.value = await getServerStatus();
+    await refreshDashboard();
   } catch (error) {
     setNotice("error", errorMessage(error));
   } finally {
@@ -300,6 +331,23 @@ async function copy(value: string, message: string) {
   }
 }
 
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let amount = value;
+  let index = 0;
+  while (amount >= 1024 && index < units.length - 1) {
+    amount /= 1024;
+    index += 1;
+  }
+  return `${amount.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatUnix(seconds: number) {
+  if (!seconds) return "—";
+  return new Date(seconds * 1000).toLocaleString("zh-CN", { hour12: false });
+}
+
 onMounted(async () => {
   unlisteners.push(
     await listen<ServerRuntimeStatus>("server://status", (event) => (status.value = event.payload)),
@@ -307,12 +355,18 @@ onMounted(async () => {
   );
   try {
     await hydrate();
+    dashboardTimer = setInterval(() => {
+      if (status.value.running) void refreshDashboard();
+    }, 10_000);
   } catch (error) {
     setNotice("error", errorMessage(error));
   }
 });
 
 onBeforeUnmount(() => unlisteners.splice(0).forEach((unlisten) => unlisten()));
+onBeforeUnmount(() => {
+  if (dashboardTimer) clearInterval(dashboardTimer);
+});
 </script>
 
 <template>
@@ -334,6 +388,32 @@ onBeforeUnmount(() => unlisteners.splice(0).forEach((unlisten) => unlisten()));
     <section class="panel config-form"><div class="panel-heading"><div><div class="panel-kicker">FRPS CONFIGURATION</div><h2>服务端配置</h2></div><span class="form-status" :class="configured ? 'is-ready' : 'is-empty'"><span class="status-dot"></span>{{ configured ? '已保存配置' : '待导入或生成' }}</span></div><div class="field-grid"><label class="field"><span class="field-label">Server Profile 名称</span><input v-model="profileName" /></label><label class="field"><span class="field-label">配置来源</span><select v-model="nativeConfig.source"><option value="managed">导入到 App 私有副本（可编辑）</option><option value="external_readonly">引用外部 frps 配置（只读）</option></select></label></div><div v-if="nativeConfig.source === 'managed'" class="native-import"><label class="field"><span class="field-label">导入 frps.toml</span><input type="file" accept=".toml,text/plain" @change="handleConfigFile" /></label><span class="field-hint">{{ importedName || '选择现有配置，或使用服务端向导生成一份安全起始配置。' }}</span></div><label v-else class="field"><span class="field-label">外部 frps 配置绝对路径</span><input v-model="nativeConfig.config_path" placeholder="/etc/frp/frps.toml" /><span class="field-hint">App 只保存路径，不读取、改写或接管外部服务。</span></label><label v-if="nativeConfig.source === 'managed'" class="field"><span class="field-label">高级 frps TOML</span><textarea v-model="serverToml" class="code-area" spellcheck="false" aria-label="高级 frps TOML 编辑器"></textarea></label><div class="config-options"><label class="toggle-row"><input v-model="nativeConfig.auto_start" type="checkbox" /><span class="toggle-control"><span></span></span><span><strong>打开 App 后自动启动 frps</strong><small>只启动当前 Server Profile</small></span></label></div><div class="form-actions"><button type="button" class="button button-primary" :disabled="busy !== null" @click="saveProfile"><i class="bi bi-floppy"></i>保存 Server Profile</button><button type="button" class="button button-secondary" :disabled="busy !== null || !configured" @click="start"><i class="bi bi-shield-check"></i>校验并启动</button></div></section>
 
     <section v-if="nativeConfig.source === 'managed'" class="panel server-builder"><div class="panel-heading"><div><div class="panel-kicker">SERVER SETUP WIZARD</div><h2>常用服务端配置向导</h2></div><button type="button" class="button button-secondary button-small" @click="generateServerToml">生成 frps TOML</button></div><p class="field-hint">生成的配置默认启用 token、强制 TLS，并将 Dashboard 绑定到本机回环地址；保存后仍会由内置 frps verify 再次校验。</p><div class="field-grid"><label class="field"><span class="field-label">监听地址</span><input v-model="serverForm.bindAddr" placeholder="0.0.0.0" /></label><label class="field"><span class="field-label">bindPort</span><input v-model="serverForm.bindPort" inputmode="numeric" /></label><label class="field"><span class="field-label">客户端连接地址</span><input v-model="serverForm.serverAddr" placeholder="公网 IP / 域名 / 局域网地址" /></label><label class="field"><span class="field-label">服务端 Token</span><input v-model="serverForm.authToken" type="password" /></label><label class="field"><span class="field-label">Dashboard 地址</span><input v-model="serverForm.dashboardAddr" /></label><label class="field"><span class="field-label">Dashboard 端口</span><input v-model="serverForm.dashboardPort" inputmode="numeric" /></label><label class="field"><span class="field-label">Dashboard 用户</span><input v-model="serverForm.dashboardUser" /></label><label class="field"><span class="field-label">Dashboard 密码</span><input v-model="serverForm.dashboardPassword" type="password" /></label></div><label class="toggle-row"><input v-model="serverForm.tlsForce" type="checkbox" /><span class="toggle-control"><span></span></span><span><strong>强制客户端 TLS</strong><small>推荐开启，客户端配置需匹配 TLS</small></span></label></section>
+
+    <section class="panel server-dashboard-panel">
+      <div class="panel-heading">
+        <div><div class="panel-kicker">FRPS DASHBOARD / READ ONLY</div><h2>接入客户端与代理状态</h2></div>
+        <button type="button" class="button button-secondary button-small" :disabled="!activeProfile?.id" @click="refreshDashboard"><i class="bi bi-arrow-clockwise"></i>刷新状态</button>
+      </div>
+      <div v-if="dashboard.available" class="server-dashboard-content">
+        <div class="metric-grid server-metric-grid">
+          <div class="metric-card"><span>客户端</span><strong>{{ dashboard.online_clients }} / {{ dashboard.client_counts }}</strong><small>在线 / 已登记</small></div>
+          <div class="metric-card"><span>代理</span><strong>{{ dashboard.online_proxies }} / {{ dashboard.proxy_counts }}</strong><small>在线 / 已发现</small></div>
+          <div class="metric-card"><span>当前连接</span><strong>{{ dashboard.current_connections }}</strong><small>frps 当前连接数</small></div>
+          <div class="metric-card"><span>累计流量</span><strong>{{ formatBytes(dashboard.total_traffic_in + dashboard.total_traffic_out) }}</strong><small>入 {{ formatBytes(dashboard.total_traffic_in) }} · 出 {{ formatBytes(dashboard.total_traffic_out) }}</small></div>
+        </div>
+        <div class="server-dashboard-section">
+          <div class="panel-heading compact-heading"><div><div class="panel-kicker">CLIENTS</div><h3>已连接客户端</h3></div><span class="field-hint">{{ dashboard.endpoint }} · frps {{ dashboard.version || '—' }}</span></div>
+          <div v-if="!dashboard.clients.length" class="dashboard-empty">暂无客户端记录；把生成的 frpc 配置部署到其他设备后，这里会显示连接状态。</div>
+          <div v-else class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr><th>状态</th><th>Client ID</th><th>主机</th><th>地址</th><th>版本</th><th>最近连接</th></tr></thead><tbody><tr v-for="client in dashboard.clients" :key="client.key"><td><span class="dashboard-status" :class="client.online ? 'online' : 'offline'"><span class="status-dot"></span>{{ client.online ? '在线' : '离线' }}</span></td><td><code>{{ client.client_id || '—' }}</code></td><td>{{ client.hostname || '—' }}</td><td>{{ client.client_ip || '—' }}</td><td>{{ client.version || '—' }}</td><td>{{ formatUnix(client.last_connected_at) }}</td></tr></tbody></table></div>
+        </div>
+        <div class="server-dashboard-section">
+          <div class="panel-heading compact-heading"><div><div class="panel-kicker">PROXIES</div><h3>代理状态</h3></div><span class="field-hint">只读数据，不会修改其他设备配置</span></div>
+          <div v-if="!dashboard.proxies.length" class="dashboard-empty">暂无代理记录；客户端连接后还需要在自己的配置中添加 `[[proxies]]`。</div>
+          <div v-else class="dashboard-table-wrap"><table class="dashboard-table"><thead><tr><th>状态</th><th>名称</th><th>类型</th><th>客户端</th><th>远程端口 / 域名</th><th>今日流量</th><th>连接</th></tr></thead><tbody><tr v-for="proxy in dashboard.proxies" :key="`${proxy.client_id}-${proxy.name}`"><td><span class="dashboard-status" :class="proxy.state === 'online' ? 'online' : 'offline'"><span class="status-dot"></span>{{ proxy.state || '未知' }}</span></td><td><code>{{ proxy.name }}</code></td><td>{{ proxy.proxy_type }}</td><td><code>{{ proxy.client_id || '—' }}</code></td><td>{{ proxy.remote_port || (proxy.domains.length ? proxy.domains.join(', ') : '—') }}</td><td>入 {{ formatBytes(proxy.today_traffic_in) }} · 出 {{ formatBytes(proxy.today_traffic_out) }}</td><td>{{ proxy.current_connections }}</td></tr></tbody></table></div>
+        </div>
+      </div>
+      <div v-else class="dashboard-unavailable"><i class="bi bi-speedometer2"></i><div><strong>Dashboard 暂不可用</strong><p>{{ dashboard.error || '请先启动本机 frps，并确保托管配置包含 webServer.port。' }}</p><small>App 只读取本机托管配置中的 Dashboard 地址和凭据；外部只读配置不会被读取或接管。</small></div></div>
+    </section>
 
     <section class="panel server-access-panel"><div class="panel-heading"><div><div class="panel-kicker">CLIENT ONBOARDING</div><h2>其他客户端接入配置</h2></div><button type="button" class="button button-secondary button-small" :disabled="!clientAccessToml" @click="copy(clientAccessToml, '客户端接入配置已复制')"><i class="bi bi-copy"></i>复制 TOML</button></div><p class="field-hint">这是客户端连接服务端的基础配置；每台设备仍需在 `[[proxies]]` 下添加自己的代理定义。</p><textarea class="code-area" :value="clientAccessToml || '先在服务端向导填写可达地址与 Token，再生成客户端接入配置。'" readonly spellcheck="false" aria-label="客户端接入 TOML"></textarea></section>
 

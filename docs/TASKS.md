@@ -95,9 +95,19 @@
 - [ ] 以预发布 tag 验证一次 Draft Release 的校验和、SBOM 与 provenance。
 - [ ] 在配置 Apple Developer ID、notarization 和 Authenticode 凭据后完成一次签名 Release 演练。
 
+## M11：本机 frps 服务端与 Dashboard
+
+- [x] 内置官方 macOS `frps` sidecar，并按目标架构校验版本、格式和 SHA-256。
+- [x] 添加独立 Server Profile、托管/外部只读配置、启动前 `frps verify` 和托盘启停。
+- [x] 添加服务端配置向导、客户端接入模板和服务端日志脱敏。
+- [x] 接入 FRP 0.71.0 Dashboard v2 只读 API，显示系统流量、客户端、代理和在线状态。
+- [x] 使用实际 `frps` + `frpc` 联调验证在线客户端、在线代理和远程端口展示。
+- [ ] 设计基于 Agent/OIDC 的逐客户端授权、吊销和远程配置；共享 Token 模式不提供此能力。
+
 ## 当前限制
 
 - 只支持一个连接 Profile。
 - 不自动执行 `join-token` 注册。
 - 不做 Apple notarization。
 - 不保证 worker、remote shell、WireGuard 等高级能力在桌面图形壳里可用。
+- Dashboard 仅查询 App 托管的 `frps` 配置；外部只读服务端不会被读取、接管或远程管理。

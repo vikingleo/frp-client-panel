@@ -245,6 +245,55 @@ pub struct ServerRuntimeStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ServerDashboardStatus {
+    pub available: bool,
+    pub endpoint: Option<String>,
+    pub version: Option<String>,
+    pub total_traffic_in: i64,
+    pub total_traffic_out: i64,
+    pub current_connections: i64,
+    pub client_counts: i64,
+    pub online_clients: i64,
+    pub proxy_counts: i64,
+    pub online_proxies: i64,
+    pub clients: Vec<ServerDashboardClient>,
+    pub proxies: Vec<ServerDashboardProxy>,
+    pub refreshed_at_ms: u128,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerDashboardClient {
+    pub key: String,
+    pub user: String,
+    pub client_id: String,
+    pub run_id: String,
+    pub version: String,
+    pub hostname: String,
+    pub client_ip: String,
+    pub first_connected_at: i64,
+    pub last_connected_at: i64,
+    pub disconnected_at: i64,
+    pub online: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerDashboardProxy {
+    pub name: String,
+    pub user: String,
+    pub client_id: String,
+    pub proxy_type: String,
+    pub state: String,
+    pub today_traffic_in: i64,
+    pub today_traffic_out: i64,
+    pub current_connections: i64,
+    pub last_start_at: i64,
+    pub last_close_at: i64,
+    pub remote_port: Option<i64>,
+    pub domains: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
     pub stream: String,
     pub line: String,

@@ -69,6 +69,7 @@ if [[ "${host_target}" == "${target_triple}" ]]; then
     for fixture_name in \
       frpc-valid.toml \
       frpc-integration.toml \
+      frpc-dashboard-integration.toml \
       frpc-generated-tcp.toml \
       frpc-generated-udp.toml \
       frpc-generated-http.toml \
@@ -81,7 +82,7 @@ if [[ "${host_target}" == "${target_triple}" ]]; then
       "${binary_path}" verify -c "${fixture_path}"
     done
   elif [[ "${component}" == "frps" ]]; then
-    for fixture_name in frps-valid.toml frps-integration.toml; do
+    for fixture_name in frps-valid.toml frps-integration.toml frps-dashboard-integration.toml; do
       fixture_path="${project_root}/src-tauri/tests/fixtures/${fixture_name}"
       [[ -f "${fixture_path}" ]] || {
         printf 'Native frps fixture is missing: %s\n' "${fixture_path}" >&2

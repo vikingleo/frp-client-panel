@@ -17,6 +17,7 @@ use server_config::{
     delete_server_profile, list_server_profiles, load_managed_server_config, load_server_profile,
     save_server_profile, select_server_profile,
 };
+use server_dashboard::get_server_dashboard_status;
 use server_process::{
     clear_server_logs, get_server_logs, get_server_status, start_server_profile,
     start_server_profile_inner, stop_server, stop_server_inner,
@@ -30,6 +31,7 @@ mod discovery;
 mod process;
 mod runtime;
 mod server_config;
+mod server_dashboard;
 mod server_process;
 mod sidecar;
 mod tray;
@@ -134,6 +136,7 @@ pub fn run() {
             get_server_status,
             get_server_logs,
             clear_server_logs,
+            get_server_dashboard_status,
             get_sidecar_info,
             get_external_client_discovery
         ])
