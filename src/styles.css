@@ -368,6 +368,11 @@ button:disabled {
   box-shadow: 0 0 0 3px var(--danger-ring);
 }
 
+.tone-info .status-dot {
+  background: var(--blue);
+  box-shadow: 0 0 0 3px rgba(125, 185, 255, 0.14);
+}
+
 .sidebar-footer {
   display: flex;
   align-items: center;
@@ -782,6 +787,11 @@ h2 {
   background: var(--status-error-bg);
 }
 
+.status-panel.state-external {
+  border-color: var(--info-border);
+  background: var(--blue-soft);
+}
+
 .status-panel-main,
 .status-panel-meta,
 .status-icon,
@@ -829,6 +839,12 @@ h2 {
   border-color: var(--danger-border);
   color: var(--red);
   background: var(--red-soft);
+}
+
+.state-external .status-icon {
+  border-color: var(--info-border);
+  color: var(--blue);
+  background: var(--blue-soft);
 }
 
 .status-label {

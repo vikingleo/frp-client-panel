@@ -36,6 +36,7 @@ type ViewName = "overview" | "config" | "logs" | "about";
 type BusyAction = "loading" | "parsing" | "saving" | "starting" | "stopping" | null;
 type NoticeKind = "success" | "error" | "info";
 type ThemePreference = "system" | "light" | "dark";
+type DisplayState = RuntimeState | "external";
 
 const activeView = ref<ViewName>("overview");
 const config = ref<ConnectionConfig>(emptyConfig());
@@ -83,11 +84,12 @@ const pageMeta: Record<ViewName, { title: string; eyebrow: string }> = {
   about: { title: "应用与客户端", eyebrow: "SYSTEM / SIDECAR" },
 };
 
-const stateMeta: Record<RuntimeState, { label: string; description: string; tone: string }> = {
-  stopped: { label: "未连接", description: "客户端进程没有运行", tone: "neutral" },
+const stateMeta: Record<DisplayState, { label: string; description: string; tone: string }> = {
+  stopped: { label: "未连接", description: "没有检测到内置或外部 Client 进程", tone: "neutral" },
   starting: { label: "正在连接", description: "正在等待 frp-panel Master 响应", tone: "warning" },
   running: { label: "已连接", description: "frp-panel-client 正在运行", tone: "success" },
   error: { label: "连接错误", description: "客户端停止或返回了错误", tone: "danger" },
+  external: { label: "外部运行", description: "命令行 Client 正在运行，本应用仅只读观测", tone: "info" },
 };
 
 const navItems: Array<{ id: ViewName; label: string; icon: string }> = [
@@ -98,7 +100,6 @@ const navItems: Array<{ id: ViewName; label: string; icon: string }> = [
 ];
 
 const currentPage = computed(() => pageMeta[activeView.value]);
-const currentState = computed(() => stateMeta[status.value.state] ?? stateMeta.stopped);
 const resolvedTheme = computed<"light" | "dark">(() =>
   themePreference.value === "system"
     ? systemPrefersDark.value
@@ -113,6 +114,12 @@ const currentConfigExternalClient = computed(() => {
   return externalDiscovery.value.running_clients.find((client) => client.client_id === clientId) ?? null;
 });
 const hasExternalClientConflict = computed(() => currentConfigExternalClient.value !== null);
+const monitoredExternalClient = computed(() => currentConfigExternalClient.value ?? externalDiscovery.value.running_clients[0] ?? null);
+const displayState = computed<DisplayState>(() => {
+  if (!status.value.running && monitoredExternalClient.value) return "external";
+  return status.value.state;
+});
+const currentState = computed(() => stateMeta[displayState.value] ?? stateMeta.stopped);
 const hasConfig = computed(() => {
   const value = config.value;
   return [value.client_id, value.client_secret, value.api_url, value.rpc_url].every((item) => item.trim());
@@ -131,8 +138,11 @@ const connectionHint = computed(() => {
   return `${config.value.client_id} · ${config.value.api_url}`;
 });
 const uptimeLabel = computed(() => {
-  if (!status.value.running || status.value.started_at_ms == null) return "—";
-  return formatDuration(Number(status.value.started_at_ms));
+  if (status.value.running && status.value.started_at_ms != null) {
+    return formatDuration(Number(status.value.started_at_ms));
+  }
+  if (displayState.value === "external") return formatSeconds(monitoredExternalClient.value?.run_time_seconds ?? null);
+  return "—";
 });
 const logText = computed(() =>
   logs.value
@@ -614,7 +624,7 @@ watch(themePreference, (preference) => {
             <div>
               <div class="eyebrow">{{ currentPage.eyebrow }}</div>
               <h1 id="overview-title">{{ currentPage.title }}</h1>
-              <p class="page-subtitle">单 Profile 受管客户端控制台</p>
+              <p class="page-subtitle">单 Profile 控制台，兼容已运行的命令行 Client</p>
             </div>
             <button
               v-if="!isRunning"
@@ -635,12 +645,13 @@ watch(themePreference, (preference) => {
             </button>
           </div>
 
-          <div class="status-panel" :class="`state-${status.state}`">
+          <div class="status-panel" :class="`state-${displayState}`">
             <div class="status-panel-main">
               <div class="status-icon" aria-hidden="true">
-                <i v-if="status.state === 'starting'" class="bi bi-arrow-repeat spinning"></i>
-                <i v-else-if="status.state === 'running'" class="bi bi-check-circle-fill"></i>
-                <i v-else-if="status.state === 'error'" class="bi bi-exclamation-triangle-fill"></i>
+                <i v-if="displayState === 'starting'" class="bi bi-arrow-repeat spinning"></i>
+                <i v-else-if="displayState === 'running'" class="bi bi-check-circle-fill"></i>
+                <i v-else-if="displayState === 'external'" class="bi bi-terminal-fill"></i>
+                <i v-else-if="displayState === 'error'" class="bi bi-exclamation-triangle-fill"></i>
                 <i v-else class="bi bi-wifi-off"></i>
               </div>
               <div>
@@ -654,8 +665,8 @@ watch(themePreference, (preference) => {
                 <strong>{{ uptimeLabel }}</strong>
               </div>
               <div>
-                <span class="meta-label">日志条数</span>
-                <strong>{{ logs.length }}</strong>
+                <span class="meta-label">{{ displayState === 'external' ? '外部 PID' : '日志条数' }}</span>
+                <strong>{{ displayState === 'external' ? monitoredExternalClient?.pid ?? '—' : logs.length }}</strong>
               </div>
             </div>
           </div>
