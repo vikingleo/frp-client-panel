@@ -94,7 +94,7 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frpc
 7. 不扩大 Tauri shell capability；任何新增 sidecar 参数都应由 Rust 后端构造和校验。
 8. 外部进程发现只能读取非敏感字段：不得复制、显示、日志化、持久化 `-s` / `--secret` 的值。
 9. 不自动停止、接管、重启或修改外部 Client 与外部 LaunchAgent；同 Client ID 时只阻止重复启动内置 sidecar。
-10. 原生 Profile 启动前必须执行固定参数的 `frpc verify -c <配置>`；前端不可传入任意 shell 命令或二进制路径。
+10. 原生 Client / Server Profile 启动前必须分别执行固定参数的 `frpc verify -c <配置>` / `frps verify -c <配置>`；前端不可传入任意 shell 命令或二进制路径。
 11. App 托管原生配置只写 TOML、设置 0600 权限；外部原生配置仅保存其路径，不读写内容或 Secret。
 
 ## 测试与本地验证
@@ -107,6 +107,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 pnpm verify:client
 pnpm verify:frpc
+pnpm verify:frps
 pnpm verify:bundle
 ```
 
@@ -118,7 +119,7 @@ pnpm bundle:linux
 pnpm bundle:windows
 ```
 
-新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及外部发现时，至少覆盖 Client 命令识别、非 Client 命令忽略、同 ID/配置路径冲突、二进制去重，以及不返回 Secret；macOS 还应覆盖 LaunchAgent plist 解析。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client`、`verify:frpc` 与 `verify:bundle`。
+新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及外部发现时，至少覆盖 Client 命令识别、非 Client 命令忽略、同 ID/配置路径冲突、二进制去重，以及不返回 Secret；macOS 还应覆盖 LaunchAgent plist 解析。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client`、`verify:frpc`、`verify:frps` 与 `verify:bundle`。
 
 ## 依赖与供应链
 

@@ -22,7 +22,7 @@ is documented in `scripts/sync-frp-panel-client.sh` and `docs/DEVELOPMENT.md`.
 
 ## fatedier/frp
 
-- Component: official `frpc` sidecar for native-frp Profiles.
+- Component: official `frpc` and `frps` sidecars for native FRP Client and Server Profiles.
 - Source repository: `fatedier/frp`.
 - Pinned version: `v0.71.0`.
 - macOS source assets:
@@ -30,9 +30,9 @@ is documented in `scripts/sync-frp-panel-client.sh` and `docs/DEVELOPMENT.md`.
     - SHA-256: `45be02b186860d375ed49a8941ae9569628a54bf14e67fc36b29c98c99dabcc6`
   - `frp_0.71.0_darwin_amd64.tar.gz`
     - SHA-256: `1b1b4e2f1836e21e8733f1dddaacd4ed9ae67d7dbee39046b9d7b7eda6253637`
-- Acquisition and verification: `scripts/sync-frpc.sh` downloads a pinned
-  official archive, verifies the archive SHA-256 before extraction, and copies
-  only the `frpc` executable into the Tauri sidecar directory.
+- Acquisition and verification: `scripts/sync-frpc.sh` and `scripts/sync-frps.sh`
+  download a pinned official archive, verify the archive SHA-256 before extraction,
+  and copy only the matching `frpc` or `frps` executable into the Tauri sidecar directory.
 - License: Apache License 2.0; the official source archive contains the
   corresponding license text.
 - Local modifications: none.

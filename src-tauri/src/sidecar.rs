@@ -49,12 +49,25 @@ pub fn native_expected_name() -> String {
     format!("frpc-{}{}", target_triple(), extension)
 }
 
+pub fn server_expected_name() -> String {
+    let extension = if cfg!(target_os = "windows") {
+        ".exe"
+    } else {
+        ""
+    };
+    format!("frps-{}{}", target_triple(), extension)
+}
+
 pub fn sidecar_available(app: &AppHandle) -> bool {
     app.shell().sidecar("frp-panel-client").is_ok()
 }
 
 pub fn native_sidecar_available(app: &AppHandle) -> bool {
     app.shell().sidecar("frpc").is_ok()
+}
+
+pub fn server_sidecar_available(app: &AppHandle) -> bool {
+    app.shell().sidecar("frps").is_ok()
 }
 
 fn missing_sidecar_hint() -> String {
@@ -70,6 +83,7 @@ fn missing_sidecar_hint() -> String {
 pub fn get_sidecar_info(app: AppHandle) -> SidecarInfo {
     let available = sidecar_available(&app);
     let native_available = native_sidecar_available(&app);
+    let server_available = server_sidecar_available(&app);
     SidecarInfo {
         available,
         target_triple: target_triple().to_string(),
@@ -82,6 +96,9 @@ pub fn get_sidecar_info(app: AppHandle) -> SidecarInfo {
         native_available,
         native_target_triple: target_triple().to_string(),
         native_expected_name: native_expected_name(),
+        server_available,
+        server_target_triple: target_triple().to_string(),
+        server_expected_name: server_expected_name(),
     }
 }
 
@@ -122,6 +139,16 @@ pub fn native_sidecar_command(
         .map(|command| command.args(args))
 }
 
+pub fn server_sidecar_command(
+    app: &AppHandle,
+    args: Vec<String>,
+) -> Result<tauri_plugin_shell::process::Command, String> {
+    app.shell()
+        .sidecar("frps")
+        .map_err(|error| format!("内置 frps 不可用：{error}"))
+        .map(|command| command.args(args))
+}
+
 fn tls_skip_verify_value(allow_insecure_tls: bool) -> &'static str {
     if allow_insecure_tls {
         "true"
@@ -132,7 +159,7 @@ fn tls_skip_verify_value(allow_insecure_tls: bool) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{native_expected_name, tls_skip_verify_value};
+    use super::{native_expected_name, server_expected_name, tls_skip_verify_value};
 
     #[test]
     fn tls_verification_is_enabled_by_default() {
@@ -147,5 +174,10 @@ mod tests {
     #[test]
     fn native_sidecar_uses_tauri_target_specific_name() {
         assert!(native_expected_name().starts_with("frpc-"));
+    }
+
+    #[test]
+    fn server_sidecar_uses_tauri_target_specific_name() {
+        assert!(server_expected_name().starts_with("frps-"));
     }
 }

@@ -18,6 +18,26 @@ export interface NativeFrpcConfig {
   launch_at_login: boolean;
 }
 
+export interface NativeFrpsConfig {
+  config_path: string;
+  source: NativeConfigSource;
+  auto_start: boolean;
+}
+
+export interface ServerProfile {
+  id: string;
+  name: string;
+  native: NativeFrpsConfig;
+}
+
+export interface ServerProfileSummary {
+  id: string;
+  name: string;
+  active: boolean;
+  configured: boolean;
+  config_path: string;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -50,6 +70,18 @@ export interface RuntimeStatus {
   config_path: string | null;
 }
 
+export interface ServerRuntimeStatus {
+  state: RuntimeState;
+  state_label: RuntimeState;
+  running: boolean;
+  error: string | null;
+  started_at_ms: number | null;
+  sidecar_available: boolean;
+  profile_id: string | null;
+  binary_name: string | null;
+  config_path: string | null;
+}
+
 export interface LogEntry {
   stream: "stdout" | "stderr" | "system";
   line: string;
@@ -64,6 +96,9 @@ export interface SidecarInfo {
   native_available: boolean;
   native_target_triple: string;
   native_expected_name: string;
+  server_available: boolean;
+  server_target_triple: string;
+  server_expected_name: string;
 }
 
 export interface ExternalBinaryInfo {

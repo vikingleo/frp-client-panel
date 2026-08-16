@@ -1,0 +1,15 @@
+bindAddr = "127.0.0.1"
+bindPort = 7000
+
+[auth]
+method = "token"
+token = "not-a-real-server-token"
+
+[transport.tls]
+force = true
+
+[webServer]
+addr = "127.0.0.1"
+port = 7500
+user = "admin"
+password = "not-a-real-dashboard-password"

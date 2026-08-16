@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import ServerPanel from "./components/ServerPanel.vue";
 import {
   disable as disableAutostart,
   enable as enableAutostart,
@@ -41,7 +42,7 @@ import type {
   SidecarInfo,
 } from "./types";
 
-type ViewName = "overview" | "config" | "logs" | "about";
+type ViewName = "overview" | "server" | "config" | "logs" | "about";
 type BusyAction = "loading" | "parsing" | "saving" | "starting" | "stopping" | null;
 type NoticeKind = "success" | "error" | "info";
 type ThemePreference = "system" | "light" | "dark";
@@ -122,6 +123,7 @@ const themeOptions: Array<{ value: ThemePreference; label: string; icon: string 
 
 const navItems: Array<{ id: ViewName; label: string; icon: string }> = [
   { id: "overview", label: "总览", icon: "bi-grid-1x2" },
+  { id: "server", label: "本机 frps", icon: "bi-hdd-network" },
   { id: "config", label: "配置", icon: "bi-sliders2" },
   { id: "logs", label: "日志", icon: "bi-terminal" },
   { id: "about", label: "关于", icon: "bi-info-circle" },
@@ -129,6 +131,7 @@ const navItems: Array<{ id: ViewName; label: string; icon: string }> = [
 
 const pageMeta: Record<ViewName, { title: string; eyebrow: string }> = {
   overview: { title: "连接总览", eyebrow: "PROFILE / RUNTIME" },
+  server: { title: "本机 FRP 服务端", eyebrow: "SERVER / FRPS RUNTIME" },
   config: { title: "Profile 配置", eyebrow: "PANEL + NATIVE FRPC" },
   logs: { title: "实时日志", eyebrow: "RUNTIME / STREAM OUTPUT" },
   about: { title: "应用与引擎", eyebrow: "SYSTEM / SIDECAR" },
@@ -588,7 +591,7 @@ watch(themePreference, (preference) => {
     <aside class="sidebar">
       <div class="brand-block">
         <div class="brand-mark" aria-hidden="true"><i class="bi bi-diagram-3-fill"></i></div>
-        <div><div class="brand-name">FRP CLIENT</div><div class="brand-caption">PANEL + NATIVE</div></div>
+        <div><div class="brand-name">FRP CONTROL</div><div class="brand-caption">CLIENT + SERVER</div></div>
       </div>
 
       <div class="sidebar-section-label">工作区</div>
@@ -635,6 +638,8 @@ watch(themePreference, (preference) => {
 
           <section class="panel external-clients-panel"><div class="panel-heading"><div><div class="panel-kicker">EXTERNAL PROCESS DISCOVERY</div><h2>系统已有实例（只读）</h2></div><button type="button" class="button button-secondary button-small" @click="refreshRuntime"><i class="bi bi-arrow-clockwise"></i>重新检测</button></div><div class="external-safety-note"><i class="bi bi-shield-check"></i><span>不会读取 Token、TLS 私钥或外部配置内容；不会停止、重载、接管任何外部进程或 LaunchAgent。</span></div><div class="external-grid"><div class="external-source-block"><div class="external-source-heading"><i class="bi bi-diagram-3"></i><strong>frp-panel Client</strong><span>{{ externalDiscovery.running_clients.length }}</span></div><p v-if="!externalDiscovery.running_clients.length">未检测到外部受管 Client。</p><div v-for="client in externalDiscovery.running_clients" :key="client.pid" class="external-source-row"><div><code>{{ client.binary_name }} · PID {{ client.pid }}</code><span>{{ client.client_id ?? '未能读取 Client ID' }} · {{ formatSeconds(client.run_time_seconds) }}</span></div><button type="button" class="text-button" @click="importPanelExternal(client)">填入安全字段</button></div></div><div class="external-source-block"><div class="external-source-heading"><i class="bi bi-terminal"></i><strong>原生 frpc</strong><span>{{ externalDiscovery.native_running_clients.length }}</span></div><p v-if="!externalDiscovery.native_running_clients.length">未检测到外部 frpc。</p><div v-for="client in externalDiscovery.native_running_clients" :key="client.pid" class="external-source-row"><div><code>{{ client.binary_name }} · PID {{ client.pid }}</code><span>{{ client.config_path ?? '未提供 -c / --config 路径' }} · {{ formatSeconds(client.run_time_seconds) }}</span></div></div></div></div><div class="external-grid minor"><div class="external-source-block"><div class="external-source-heading"><i class="bi bi-hdd-network"></i><strong>发现的 frpc 二进制</strong><span>{{ externalDiscovery.native_installed_binaries.length }}</span></div><p v-if="!externalDiscovery.native_installed_binaries.length">未在 PATH / 常用目录发现 frpc。</p><div v-for="binary in externalDiscovery.native_installed_binaries" :key="binary.path" class="external-source-row"><code>{{ binary.path }}</code></div></div><div class="external-source-block"><div class="external-source-heading"><i class="bi bi-rocket-takeoff"></i><strong>frpc LaunchAgent</strong><span>{{ externalDiscovery.native_startup_items.length }}</span></div><p v-if="!externalDiscovery.native_startup_items.length">未发现外部 frpc 启动项。</p><div v-for="item in externalDiscovery.native_startup_items" :key="item.path" class="external-source-row"><div><code>{{ item.label }}</code><span>{{ item.config_path ?? '未能读取配置路径' }}</span></div></div></div></div></section>
         </section>
+
+        <section v-else-if="activeView === 'server'" class="view"><ServerPanel /></section>
 
         <section v-else-if="activeView === 'config'" class="view">
           <div class="page-heading compact-heading"><div><div class="eyebrow">{{ currentPage.eyebrow }}</div><h1>{{ currentPage.title }}</h1><p class="page-subtitle">受管 frp-panel 与标准 frpc 使用不同的 Profile 和运行时，互不覆盖。</p></div></div>

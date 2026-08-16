@@ -4,7 +4,7 @@
 
 1. `main` 分支受保护，所有 PR 通过 CI。
 2. `package.json`、`src-tauri/Cargo.toml` 与 `src-tauri/tauri.conf.json` 的版本一致。
-3. 四个桌面 runner 均已通过 panel sidecar、测试与 bundle 验证；两个 macOS runner 还必须通过官方 frpc sidecar 下载、SHA-256 与 bundle 验证。
+3. 四个桌面 runner 均已通过 panel sidecar、测试与 bundle 验证；两个 macOS runner 还必须通过官方 frpc / frps sidecar 下载、SHA-256 与 bundle 验证。
 4. 已审阅 `CHANGELOG.md`、许可证和第三方声明。
 5. 已完成依赖漏洞扫描和 SBOM 生成。
 6. macOS Developer ID / notarization 与 Windows Authenticode 签名材料只保存在 GitHub Secrets 或受保护环境中。
@@ -21,6 +21,8 @@ pnpm build
 cargo test --manifest-path src-tauri/Cargo.toml
 FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frpc
 FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm verify:frpc
+FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frps
+FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm verify:frps
 
 # 3. 提交并推送
 git commit -am "release: vX.Y.Z"

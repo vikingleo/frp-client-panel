@@ -1,0 +1,4 @@
+serverAddr = "127.0.0.1"
+serverPort = 17000
+loginFailExit = false
+auth.token = "local-integration-token"

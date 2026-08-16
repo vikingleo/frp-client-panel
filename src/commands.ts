@@ -8,6 +8,9 @@ import type {
   Profile,
   ProfileSummary,
   RuntimeStatus,
+  ServerProfile,
+  ServerProfileSummary,
+  ServerRuntimeStatus,
   SidecarInfo,
 } from "./types";
 
@@ -95,6 +98,57 @@ export function getSidecarInfo() {
 
 export function getExternalClientDiscovery() {
   return invoke<ExternalClientDiscovery>("get_external_client_discovery");
+}
+
+export function listServerProfiles() {
+  return invoke<ServerProfileSummary[]>("list_server_profiles");
+}
+
+export function loadServerProfile(profileId?: string) {
+  return invoke<ServerProfile | null>("load_server_profile", { profileId });
+}
+
+export function selectServerProfile(profileId: string) {
+  return invoke<void>("select_server_profile", { profileId });
+}
+
+export function saveServerProfile(options: {
+  profileId?: string;
+  name: string;
+  configPath: string;
+  source: NativeConfigSource;
+  autoStart: boolean;
+  importedContent?: string;
+}) {
+  return invoke<ServerProfile>("save_server_profile", options);
+}
+
+export function loadManagedServerConfig(profileId: string) {
+  return invoke<string>("load_managed_server_config", { profileId });
+}
+
+export function deleteServerProfile(profileId: string) {
+  return invoke<void>("delete_server_profile", { profileId });
+}
+
+export function startServerProfile(profileId?: string) {
+  return invoke<void>("start_server_profile", { profileId });
+}
+
+export function stopServer() {
+  return invoke<void>("stop_server");
+}
+
+export function getServerStatus() {
+  return invoke<ServerRuntimeStatus>("get_server_status");
+}
+
+export function getServerLogs() {
+  return invoke<LogEntry[]>("get_server_logs");
+}
+
+export function clearServerLogs() {
+  return invoke<void>("clear_server_logs");
 }
 
 export function errorMessage(error: unknown): string {

@@ -27,6 +27,8 @@
     "verify:client": "bash scripts/verify-frp-panel-client.sh",
     "sync:frpc": "bash scripts/sync-frpc.sh",
     "verify:frpc": "bash scripts/verify-frpc.sh",
+    "sync:frps": "bash scripts/sync-frps.sh",
+    "verify:frps": "bash scripts/verify-frps.sh",
     "verify:bundle": "bash scripts/verify-bundle-artifact.sh",
     "checksums": "node scripts/generate-checksums.mjs",
     "audit:js": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org",

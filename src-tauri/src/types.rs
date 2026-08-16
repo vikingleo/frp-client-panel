@@ -55,6 +55,52 @@ impl NativeFrpcConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NativeFrpsConfig {
+    pub config_path: String,
+    #[serde(default)]
+    pub source: NativeConfigSource,
+    #[serde(default)]
+    pub auto_start: bool,
+}
+
+impl NativeFrpsConfig {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.config_path.trim().is_empty() {
+            return Err("原生 frps 配置文件路径不能为空".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerProfile {
+    pub id: String,
+    pub name: String,
+    pub native: NativeFrpsConfig,
+}
+
+impl ServerProfile {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.id.trim().is_empty() {
+            return Err("Server Profile ID 不能为空".into());
+        }
+        if self.name.trim().is_empty() {
+            return Err("Server Profile 名称不能为空".into());
+        }
+        self.native.validate()
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ServerProfileSummary {
+    pub id: String,
+    pub name: String,
+    pub active: bool,
+    pub configured: bool,
+    pub config_path: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConnectionConfig {
     pub client_id: String,
@@ -186,6 +232,19 @@ pub struct RuntimeStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct ServerRuntimeStatus {
+    pub state: RuntimeState,
+    pub state_label: String,
+    pub running: bool,
+    pub error: Option<String>,
+    pub started_at_ms: Option<u128>,
+    pub sidecar_available: bool,
+    pub profile_id: Option<String>,
+    pub binary_name: Option<String>,
+    pub config_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct LogEntry {
     pub stream: String,
     pub line: String,
@@ -204,6 +263,12 @@ pub struct SidecarInfo {
     pub native_target_triple: String,
     #[serde(default)]
     pub native_expected_name: String,
+    #[serde(default)]
+    pub server_available: bool,
+    #[serde(default)]
+    pub server_target_triple: String,
+    #[serde(default)]
+    pub server_expected_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Default)]

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+component="${FRP_COMPONENT:-frpc}"
 requested_target="${FRP_PANEL_TARGET_TRIPLE:-}"
 requested_arch="${FRP_PANEL_ARCH:-}"
 
@@ -33,24 +34,24 @@ case "${target_triple}" in
   aarch64-apple-darwin) expected_arch='arm64' ;;
   x86_64-apple-darwin) expected_arch='x86_64' ;;
   *)
-    printf 'Native frpc verification only supports Darwin arm64 and x86_64 targets.\n' >&2
+      printf 'Native %s verification only supports Darwin arm64 and x86_64 targets.\n' "${component}" >&2
     exit 1
     ;;
 esac
 
-binary_path="${project_root}/src-tauri/binaries/frpc-${target_triple}"
+binary_path="${project_root}/src-tauri/binaries/${component}-${target_triple}"
 [[ -f "${binary_path}" ]] || {
-  printf 'Official frpc sidecar is missing: %s\n' "${binary_path}" >&2
+  printf 'Official %s sidecar is missing: %s\n' "${component}" "${binary_path}" >&2
   exit 1
 }
 [[ -x "${binary_path}" ]] || {
-  printf 'Official frpc sidecar is not executable: %s\n' "${binary_path}" >&2
+  printf 'Official %s sidecar is not executable: %s\n' "${component}" "${binary_path}" >&2
   exit 1
 }
 
 file_description="$(file "${binary_path}")"
 if [[ "${file_description}" != *"Mach-O"* || "${file_description}" != *"${expected_arch}"* ]]; then
-  printf 'Unexpected frpc binary format for %s: %s\n' "${target_triple}" "${file_description}" >&2
+  printf 'Unexpected %s binary format for %s: %s\n' "${component}" "${target_triple}" "${file_description}" >&2
   exit 1
 fi
 
@@ -63,22 +64,34 @@ if [[ "${host_target}" == "${target_triple}" ]]; then
   }
   printf '%s\n' "${version_output}"
 
-  fixture_directory="${project_root}/src-tauri/tests/fixtures"
-  for fixture_name in \
-    frpc-valid.toml \
-    frpc-generated-tcp.toml \
-    frpc-generated-udp.toml \
-    frpc-generated-http.toml \
-    frpc-generated-https.toml; do
-    fixture_path="${fixture_directory}/${fixture_name}"
-    [[ -f "${fixture_path}" ]] || {
-      printf 'Native frpc fixture is missing: %s\n' "${fixture_path}" >&2
-      exit 1
-    }
-    "${binary_path}" verify -c "${fixture_path}"
-  done
+  if [[ "${component}" == "frpc" ]]; then
+    fixture_directory="${project_root}/src-tauri/tests/fixtures"
+    for fixture_name in \
+      frpc-valid.toml \
+      frpc-integration.toml \
+      frpc-generated-tcp.toml \
+      frpc-generated-udp.toml \
+      frpc-generated-http.toml \
+      frpc-generated-https.toml; do
+      fixture_path="${fixture_directory}/${fixture_name}"
+      [[ -f "${fixture_path}" ]] || {
+        printf 'Native frpc fixture is missing: %s\n' "${fixture_path}" >&2
+        exit 1
+      }
+      "${binary_path}" verify -c "${fixture_path}"
+    done
+  elif [[ "${component}" == "frps" ]]; then
+    for fixture_name in frps-valid.toml frps-integration.toml; do
+      fixture_path="${project_root}/src-tauri/tests/fixtures/${fixture_name}"
+      [[ -f "${fixture_path}" ]] || {
+        printf 'Native frps fixture is missing: %s\n' "${fixture_path}" >&2
+        exit 1
+      }
+      "${binary_path}" verify -c "${fixture_path}"
+    done
+  fi
 else
   printf 'Cross-target binary validated without execution: %s\n' "${target_triple}"
 fi
 
-printf 'Verified official frpc sidecar: %s\n' "${binary_path}"
+printf 'Verified official %s sidecar: %s\n' "${component}" "${binary_path}"

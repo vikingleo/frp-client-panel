@@ -2,7 +2,7 @@
 
 ## 适用对象与前提
 
-本应用有两个彼此隔离的模式：`frp-panel` 受管 Client 模式，以及 macOS 上的标准原生 `frpc` 模式。前者适用于从 frp-panel Web UI 获得启动命令的用户；后者直接运行官方 `frpc` 与 `frpc.toml`，连接配置中的 `frps`。
+本应用提供三个彼此独立的运行面：`frp-panel` 受管 Client、macOS 上的原生 `frpc` Client，以及 macOS 上的本机 `frps` Server。前两者用于连接服务端；本机 `frps` 用于让这台 Mac 接受其他设备的 frpc 连接。
 
 安装前请准备：
 
@@ -15,6 +15,8 @@
 4. 服务端的有效 TLS 证书；如使用自签名证书，需要理解并主动接受 TLS 例外风险。
 
 如果使用 **原生 frpc** 模式，还需要一份已确认可用的 TOML，或在应用中使用常用代理生成器创建 TOML。App 托管模式会自带 frpc，无需预先安装。
+
+如果使用 **本机 frps** 模式，还需要确认其他客户端能访问这台 Mac 的地址和 `bindPort`。局域网使用时检查 macOS 防火墙；跨公网使用时还需要公网地址、端口映射、IPv6 或 VPN 等可达性方案。
 
 ## 安装
 
@@ -91,6 +93,17 @@ frp-panel client -s <secret> -i <client-id> --api-url <api-url> --rpc-url <rpc-u
 App 托管模式会把 TOML 保存到应用配置目录并设置用户私有文件权限。TOML 内可能包含 `auth.token`，请勿提交到 Git、截图或共享给不可信人员。
 
 如果你已经通过命令或 LaunchAgent 运行 `frpc -c /path/frpc.toml`，总览会只读显示它的 PID、二进制、配置路径和运行时长。应用不读取配置内容、Token、TLS 私钥或插件 Secret，也不会执行 reload、stop 或改写外部配置。相同配置路径的外部 frpc 正在运行时，应用会阻止启动第二个托管实例。
+
+## 本机 frps 服务端模式（macOS）
+
+1. 打开“本机 frps”，新建或选择一个 Server Profile。
+2. 使用服务端向导生成 `frps.toml`，或导入自己的 TOML 到 App 私有副本。向导默认使用 Token、强制 TLS，并把 Dashboard 绑定在 `127.0.0.1`。
+3. 点击“保存 Server Profile”，再点击“校验并启动”。应用固定先执行 `frps verify -c`，通过后才执行 `frps -c`。
+4. 在同一页面复制“客户端接入配置”到其他设备；为每台客户端继续添加自己的 `[[proxies]]` 配置块。
+
+服务端 Token、Dashboard 密码和其他密钥会写入托管 `frps.toml`，因此该文件使用 App 私有目录和用户私有权限。不要把它提交到 Git、截图或发送给不可信人员。
+
+本机 frps 的运行状态只表示服务端进程已经启动和监听配置；它不表示每个客户端代理都可用。标准 token 模式使用的是服务端与客户端共享的认证信息：本版本可以生成接入模板，但不能远程编辑、单独批准、吊销或停止其他设备上的 frpc。
 
 ## 自动启动
 

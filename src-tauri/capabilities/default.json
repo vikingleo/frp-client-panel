@@ -23,6 +23,11 @@
           "name": "binaries/frpc",
           "sidecar": true,
           "args": false
+        },
+        {
+          "name": "binaries/frps",
+          "sidecar": true,
+          "args": false
         }
       ]
     },

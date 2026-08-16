@@ -103,6 +103,20 @@ jobs:
         env:
           FRP_PANEL_TARGET_TRIPLE: ${{ matrix.sidecar_target }}
 
+      - name: Build verified official frps sidecar
+        if: runner.os == 'macOS'
+        shell: bash
+        run: pnpm sync:frps
+        env:
+          FRP_PANEL_TARGET_TRIPLE: ${{ matrix.sidecar_target }}
+
+      - name: Verify official frps sidecar
+        if: runner.os == 'macOS'
+        shell: bash
+        run: pnpm verify:frps
+        env:
+          FRP_PANEL_TARGET_TRIPLE: ${{ matrix.sidecar_target }}
+
       - name: Build frontend
         run: pnpm build
 

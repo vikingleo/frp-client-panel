@@ -2,7 +2,8 @@
   "bundle": {
     "externalBin": [
       "binaries/frp-panel-client",
-      "binaries/frpc"
+      "binaries/frpc",
+      "binaries/frps"
     ]
   }
 }

@@ -9,14 +9,15 @@ Vue UI
   │ Tauri invoke / events
   ▼
 Rust 后端
-  ├─ config：Profile、Keychain 与托管 TOML
+  ├─ config / server_config：Client Profile、Server Profile、Keychain 与托管 TOML
   ├─ command_parser：解析 frp-panel 连接命令
   ├─ discovery：外部进程、二进制、LaunchAgent 的只读发现
-  ├─ process：verify、启动/停止、日志与运行状态
+  ├─ process / server_process：客户端与本机服务端的 verify、启动/停止、日志与运行状态
   ├─ tray：系统托盘
   └─ sidecar：目标架构与受限二进制执行
       ├─ frp-panel-client → API/RPC → frp-panel Master
-      └─ frpc → frpc.toml → frps
+      ├─ frpc → frpc.toml → frps
+      └─ frps → frps.toml → 接受其他 frpc 客户端
 ```
 
 ## Profile 与运行模式
@@ -36,6 +37,14 @@ Profile 元数据保存在 `profiles.json`。旧版单连接 `connections.json` 
 ```
 
 `reload` 不在首版自动执行：它依赖用户配置的 `webServer`，且全局连接参数变更不能可靠地仅靠 reload 生效。保存后由用户重新启动，避免产生“看似已应用、实际未生效”的状态。
+
+本机服务端 Profile 单独保存在 `servers.json`，不会占用或切换客户端 Profile。它的固定流程是：
+
+```text
+保存 frps TOML → frps verify -c <config> → frps -c <config> → stdout/stderr → 托盘和桌面状态
+```
+
+App 可以与本机 `frps` 同时托管一个客户端 Profile。服务端向导生成的是客户端接入基础配置；它不远程编辑或下发其他设备的代理定义。
 
 ## 外部实例的只读发现
 
@@ -58,30 +67,32 @@ Profile 元数据保存在 `profiles.json`。旧版单连接 `connections.json` 
 - Linux x86_64：`frp-panel-client-x86_64-unknown-linux-gnu`
 - Windows x86_64：`frp-panel-client-x86_64-pc-windows-msvc.exe`
 
-macOS 原生 frpc 由 `scripts/sync-frpc.sh` 从固定的官方 `fatedier/frp v0.71.0` archive 下载，先验证 archive SHA-256，再精确提取单个 `frpc`：
+macOS 原生 `frpc` / `frps` 由 `scripts/sync-frpc.sh` / `scripts/sync-frps.sh` 从固定的官方 `fatedier/frp v0.71.0` archive 下载，先验证 archive SHA-256，再精确提取单个目标二进制：
 
 - Apple Silicon：`frpc-aarch64-apple-darwin`
 - Intel：`frpc-x86_64-apple-darwin`
+- Apple Silicon：`frps-aarch64-apple-darwin`
+- Intel：`frps-x86_64-apple-darwin`
 
-`src-tauri/tauri.macos.conf.json` 才将 `binaries/frpc` 加进 bundle。这样 Linux/Windows 构建不会被要求交付尚未支持的 native frpc sidecar。`THIRD_PARTY_NOTICES.md` 记录了版本、来源、校验和和许可证。
+`src-tauri/tauri.macos.conf.json` 才将 `binaries/frpc` / `binaries/frps` 加进 bundle。这样 Linux/Windows 构建不会被要求交付尚未支持的 native sidecar。`THIRD_PARTY_NOTICES.md` 记录了版本、来源、校验和和许可证。
 
 ## 秘密、TOML 与日志
 
 - 面板 Client Secret 保存在系统凭据库，Rust 通过 `CLIENT_SECRET` 环境变量传给 sidecar，不出现在命令行或 `connections.json`/`profiles.json`。
-- App 托管 native TOML 使用应用私有目录并在 Unix 上设为 `0600`。TOML 可能含 `auth.token`，用户不应将其提交、上传或分享。
+- App 托管的 `frpc.toml` 与 `frps.toml` 使用应用私有目录并在 Unix 上设为 `0600`。TOML 可能含 `auth.token`、Dashboard 密码或 OIDC Secret，用户不应将其提交、上传或分享。
 - 外部 native TOML 不读取、不复制、不写入。
 - native 校验和运行日志对包含 `auth.token`、password、secret、plugin token 等典型配置行脱敏；分享日志前仍应人工检查主机、域名、端口与业务信息。
 
 ## 状态与托盘
 
-进程句柄是托管引擎运行状态的权威来源。面板 Client 还会基于其日志把状态从 `starting` 提升为 `running`；原生 frpc 的 child 成功 spawn 后显示为“frpc 运行中”。未启用 `webServer` 时，App 不会把进程运行误称为每个 proxy 均已连接。
+客户端与服务端各自有独立的进程句柄和运行状态。面板 Client 还会基于其日志把状态从 `starting` 提升为 `running`；原生 frpc 与 frps 的 child 成功 spawn 后分别显示为“frpc 运行中”和“frps 运行中”。未启用 `webServer` 时，App 不会把进程运行误称为每个 proxy 均已连接。
 
 窗口关闭默认隐藏到托盘。退出 App 时只停止 App 自己创建的 child，外部 Client/LaunchAgent 不受影响。
 
 ## 前端权限边界
 
 - 生产 CSP 只允许本地资源和 Tauri IPC。
-- Capability 只允许窗口管理、autostart 和受限的 `frp-panel-client` / `frpc` sidecar 执行。
+- Capability 只允许窗口管理、autostart 和受限的 `frp-panel-client` / `frpc` / `frps` sidecar 执行。
 - 前端无法传递任意 shell 命令、二进制路径或 sidecar 参数；Rust 后端构造固定的 `verify`、`-c` 和面板参数。
 
 ## 后续路线
