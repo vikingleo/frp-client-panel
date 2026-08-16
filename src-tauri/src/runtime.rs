@@ -12,6 +12,7 @@ pub const LOG_LIMIT: usize = 800;
 
 pub struct AppRuntime {
     pub child: Mutex<Option<CommandChild>>,
+    managed_child_pid: Mutex<Option<u32>>,
     pub state: Mutex<RuntimeState>,
     pub error: Mutex<Option<String>>,
     pub started_at: Mutex<Option<Instant>>,
@@ -23,6 +24,7 @@ impl Default for AppRuntime {
     fn default() -> Self {
         Self {
             child: Mutex::new(None),
+            managed_child_pid: Mutex::new(None),
             state: Mutex::new(RuntimeState::Stopped),
             error: Mutex::new(None),
             started_at: Mutex::new(None),
@@ -33,6 +35,22 @@ impl Default for AppRuntime {
 }
 
 impl AppRuntime {
+    pub fn managed_child_pid(&self) -> Option<u32> {
+        self.managed_child_pid.lock().ok().and_then(|pid| *pid)
+    }
+
+    pub fn set_managed_child_pid(&self, pid: u32) {
+        if let Ok(mut guard) = self.managed_child_pid.lock() {
+            *guard = Some(pid);
+        }
+    }
+
+    pub fn clear_managed_child_pid(&self) {
+        if let Ok(mut guard) = self.managed_child_pid.lock() {
+            *guard = None;
+        }
+    }
+
     pub fn status(&self, sidecar_available: bool) -> RuntimeStatus {
         let state = self.state.lock().map(|g| *g).unwrap_or(RuntimeState::Error);
         let running = self.child.lock().map(|g| g.is_some()).unwrap_or(false);

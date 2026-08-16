@@ -1,4 +1,14 @@
+use std::ffi::OsStr;
+
 use crate::types::ConnectionConfig;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SafeClientCommand {
+    pub client_id: Option<String>,
+    pub api_url: Option<String>,
+    pub rpc_url: Option<String>,
+    pub secret_argument_present: bool,
+}
 
 #[tauri::command]
 pub fn parse_panel_command(command: String) -> Result<ConnectionConfig, String> {
@@ -72,6 +82,75 @@ pub fn parse_panel_command_inner(command: &str) -> Result<ConnectionConfig, Stri
     Ok(config)
 }
 
+/// Extracts only non-sensitive client metadata from an already tokenized command.
+///
+/// This parser intentionally never copies, returns, logs, or persists an external Client Secret.
+/// It is used for observing processes and startup items that were not started by this application.
+pub(crate) fn parse_safe_client_command_tokens<T: AsRef<OsStr>>(
+    tokens: &[T],
+) -> Option<SafeClientCommand> {
+    let start = tokens
+        .iter()
+        .position(|token| safe_token_text(token) == Some("client"))?
+        + 1;
+    let mut command = SafeClientCommand::default();
+    let mut index = start;
+
+    while index < tokens.len() {
+        let Some(token) = safe_token_text(&tokens[index]) else {
+            index += 1;
+            continue;
+        };
+        match token {
+            "-s" | "--secret" => {
+                command.secret_argument_present = true;
+                // Skip the following token without reading or copying its value.
+                index += 2;
+                continue;
+            }
+            "-i" | "--id" => {
+                index += 1;
+                command.client_id = safe_token_at(tokens, index);
+            }
+            "--api-url" => {
+                index += 1;
+                command.api_url = safe_token_at(tokens, index);
+            }
+            "--rpc-url" => {
+                index += 1;
+                command.rpc_url = safe_token_at(tokens, index);
+            }
+            _ if token.starts_with("--secret=") => {
+                command.secret_argument_present = true;
+            }
+            _ if token.starts_with("--id=") => {
+                command.client_id = Some(token.trim_start_matches("--id=").to_string());
+            }
+            _ if token.starts_with("--api-url=") => {
+                command.api_url = Some(token.trim_start_matches("--api-url=").to_string());
+            }
+            _ if token.starts_with("--rpc-url=") => {
+                command.rpc_url = Some(token.trim_start_matches("--rpc-url=").to_string());
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+
+    Some(command)
+}
+
+fn safe_token_text<T: AsRef<OsStr>>(token: &T) -> Option<&str> {
+    token.as_ref().to_str()
+}
+
+fn safe_token_at<T: AsRef<OsStr>>(tokens: &[T], index: usize) -> Option<String> {
+    tokens
+        .get(index)
+        .and_then(safe_token_text)
+        .map(str::to_string)
+}
+
 fn shell_split(input: &str) -> Result<Vec<String>, String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
@@ -129,7 +208,7 @@ fn shell_split(input: &str) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_panel_command_inner;
+    use super::{parse_panel_command_inner, parse_safe_client_command_tokens};
 
     #[test]
     fn parses_direct_command() {
@@ -153,5 +232,46 @@ mod tests {
         assert_eq!(cfg.client_secret, "abc def");
         assert_eq!(cfg.api_url, "https://api.example.com");
         assert_eq!(cfg.rpc_url, "grpc://rpc.example.com:9001");
+    }
+
+    #[test]
+    fn safe_parser_never_returns_external_secret() {
+        let tokens = [
+            "frp-panel",
+            "client",
+            "-s",
+            "external-secret-must-not-leak",
+            "-i",
+            "user.c.macos",
+            "--api-url=https://api.example.com",
+            "--rpc-url",
+            "wss://rpc.example.com",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+        let parsed = parse_safe_client_command_tokens(&tokens).unwrap();
+
+        assert!(parsed.secret_argument_present);
+        assert_eq!(parsed.client_id.as_deref(), Some("user.c.macos"));
+        assert_eq!(parsed.api_url.as_deref(), Some("https://api.example.com"));
+        assert_eq!(parsed.rpc_url.as_deref(), Some("wss://rpc.example.com"));
+        assert!(!format!("{parsed:?}").contains("external-secret-must-not-leak"));
+    }
+
+    #[test]
+    fn safe_parser_ignores_non_client_commands() {
+        let tokens = [
+            "frp-panel",
+            "server",
+            "--api-url",
+            "https://api.example.com",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+        assert_eq!(parse_safe_client_command_tokens(&tokens), None);
     }
 }

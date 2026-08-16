@@ -4,6 +4,7 @@ use tauri_plugin_autostart::MacosLauncher;
 
 use command_parser::parse_panel_command;
 use config::{load_connection, save_connection};
+use discovery::get_external_client_discovery;
 use process::{clear_logs, get_logs, get_status, start_client, stop_client};
 use runtime::AppRuntime;
 use sidecar::get_sidecar_info;
@@ -11,6 +12,7 @@ use tray::init_tray;
 
 mod command_parser;
 mod config;
+mod discovery;
 mod process;
 mod runtime;
 mod sidecar;
@@ -65,7 +67,8 @@ pub fn run() {
             get_status,
             get_logs,
             clear_logs,
-            get_sidecar_info
+            get_sidecar_info,
+            get_external_client_discovery
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

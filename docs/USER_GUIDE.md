@@ -56,6 +56,26 @@ curl ... | bash -s -- client -s <secret> -i <client-id> ...
 
 首次连接可能短暂出现“config is empty, wait for server init”。这表示 Master 尚未向此 Client 下发配置；它不是桌面应用安装失败。
 
+## 已有命令行 Client、服务与开机启动
+
+如果你已经在本机通过命令行安装并运行了：
+
+```bash
+frp-panel client -s <secret> -i <client-id> --api-url <api-url> --rpc-url <rpc-url>
+```
+
+不需要再填写或执行安装命令。打开桌面应用后，在“总览”页的“系统已有 frp-panel Client”区域即可看到只读发现结果：
+
+- 在 `PATH` 和常用目录中发现的 `frp-panel` / `frp-panel-client` 二进制；
+- 正在运行的 Client 的 PID、二进制路径、Client ID、API URL、RPC URL 和运行时长；
+- macOS `~/Library/LaunchAgents` 与 `/Library/LaunchAgents` 中定义的 `frp-panel` Client 启动项。
+
+应用每 10 秒重新检测一次，也可以点击“重新检测”。启动项存在不等于 Client 当前运行；当前运行状态以进程发现结果为准。
+
+你可以点击“填入安全字段”将 Client ID、API URL、RPC URL 复制到桌面应用的配置页。外部 Client 的 Secret **不会被读取、显示或导入**，因此仍需手工填写 Secret 后才能改用内置托管模式。
+
+外部 Client 始终由原有命令、脚本或 LaunchAgent 管理：桌面应用不能读取它的 stdout/stderr，不能停止、重启、接管或修改它。若外部 Client 与当前 Profile 使用同一 Client ID，应用会禁用“连接客户端”并在后端再次阻止启动，以避免重复注册到 frp-panel Master。
+
 ## 自动启动
 
 配置页提供两个独立开关：
@@ -63,7 +83,7 @@ curl ... | bash -s -- client -s <secret> -i <client-id> ...
 - **打开应用时自动连接**：启动桌面应用后立即拉起 Client。
 - **登录后启动应用**：使用当前系统的自动启动机制，使应用登录后常驻托盘。
 
-关闭第二个开关会移除应用设置的自动启动项，但不会改动你手工创建的其他系统服务。
+关闭第二个开关会移除应用设置的自动启动项，但不会改动你手工创建的其他系统服务或发现到的 `frp-panel` LaunchAgent。已经使用外部 LaunchAgent 自启的 Client 无需开启本应用的“打开应用时自动连接”；否则相同 Client ID 会被应用安全地识别并避免重复拉起。
 
 ## TLS 证书与自签名部署
 

@@ -2,6 +2,7 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_shell::process::CommandEvent;
 
 use crate::config::load_connection_inner;
+use crate::discovery::find_external_client_conflict;
 use crate::runtime::{emit_log, emit_status, AppRuntime};
 use crate::sidecar::{sidecar_available, sidecar_command};
 use crate::types::{ConnectionConfig, LogEntry, RuntimeState, RuntimeStatus};
@@ -26,17 +27,28 @@ pub async fn start_client_inner(
         }
     }
 
+    if let Some(existing) =
+        find_external_client_conflict(&config.client_id, runtime.managed_child_pid())
+    {
+        return Err(format!(
+            "检测到系统中已有相同 Client ID 的 frp-panel Client（PID {}）。为避免重复注册，本应用不会再次启动；请在“总览”的“外部 Client”区域确认其状态，或先手动停止外部进程后再由本应用托管。",
+            existing.pid
+        ));
+    }
+
     let args = client_args(&config);
 
     let command = sidecar_command(&app, args, &config.client_secret, config.allow_insecure_tls)?;
     let (mut rx, child) = command
         .spawn()
         .map_err(|e| format!("启动 frp-panel-client 失败：{e}"))?;
+    let child_pid = child.pid();
 
     {
         let mut guard = runtime.child.lock().map_err(|e| e.to_string())?;
         *guard = Some(child);
     }
+    runtime.set_managed_child_pid(child_pid);
 
     let generation = runtime.mark_starting();
     emit_log(
@@ -85,6 +97,7 @@ pub async fn start_client_inner(
                         .lock()
                         .map(|mut guard| guard.take().is_some())
                         .unwrap_or(false);
+                    runtime.clear_managed_child_pid();
                     let msg = format!(
                         "frp-panel-client 已退出，code={:?}, signal={:?}",
                         payload.code, payload.signal
@@ -170,6 +183,7 @@ pub fn stop_client_inner(app: &AppHandle, runtime: &AppRuntime) -> Result<(), St
     };
 
     if let Some(child) = child {
+        runtime.clear_managed_child_pid();
         child
             .kill()
             .map_err(|e| format!("停止 frp-panel-client 失败：{e}"))?;

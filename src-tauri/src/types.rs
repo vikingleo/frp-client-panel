@@ -91,3 +91,41 @@ pub struct SidecarInfo {
     pub expected_name: String,
     pub hint: String,
 }
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct ExternalClientDiscovery {
+    pub installed_binaries: Vec<ExternalBinaryInfo>,
+    pub running_clients: Vec<ObservedClientInfo>,
+    pub startup_items: Vec<StartupItemInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ExternalBinaryInfo {
+    pub name: String,
+    pub path: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ObservedClientInfo {
+    pub pid: u32,
+    pub binary_name: String,
+    pub binary_path: Option<String>,
+    pub client_id: Option<String>,
+    pub api_url: Option<String>,
+    pub rpc_url: Option<String>,
+    pub started_at_epoch_seconds: Option<u64>,
+    pub run_time_seconds: Option<u64>,
+    pub secret_argument_present: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct StartupItemInfo {
+    pub label: String,
+    pub path: String,
+    pub kind: String,
+    pub client_id: Option<String>,
+    pub api_url: Option<String>,
+    pub rpc_url: Option<String>,
+    pub secret_argument_present: bool,
+}

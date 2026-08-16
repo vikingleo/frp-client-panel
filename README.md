@@ -32,6 +32,8 @@ frp-panel client \
 
 本应用解析其中的连接参数，在系统凭据库保存 Client Secret，并使用内嵌 sidecar 运行官方受管 Client。它不会自行实现 `frp-panel` 管理协议，也不会执行你粘贴的 shell 安装脚本。
 
+如果电脑上已经通过命令行安装并运行了 `frp-panel client`，应用也可以作为桌面壳进行只读适配：检测 `PATH` / 常用目录中的二进制、正在运行的 Client 进程，以及 macOS LaunchAgent；显示 PID、运行时长、Client ID 与 API/RPC URL。它不会读取外部进程的 Secret、接管或停止外部进程，也不会获取外部进程的 stdout/stderr。发现相同 `client_id` 的外部 Client 时，应用会阻止再次启动内置 Client，避免重复注册。
+
 MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目所需的 `frp-panel` 受管 Client 协议。
 
 ## 功能范围
@@ -41,6 +43,7 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 - 在系统托盘常驻，支持登录后启动应用。
 - 显示 stdout、stderr 和系统状态日志。
 - 校验内嵌 sidecar 是否与当前系统、CPU 架构匹配。
+- 只读发现系统已安装、已运行及已设置启动项的 `frp-panel` / `frp-panel-client`；可导入 Client ID、API URL、RPC URL 等非敏感字段。
 - 将 Client Secret 保存到 macOS Keychain、Windows Credential Manager 或 Linux Secret Service。
 - 默认校验 HTTPS / WSS 证书；自签名证书只能由用户明确启用例外。
 - 默认禁用上游 sidecar 的 functions 与 remote shell 功能。
@@ -55,7 +58,7 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 4. 检查 Client ID、API URL、RPC URL，保存后点击“保存并连接”。
 5. 在“日志”页面确认 Client 已注册并拉取配置。
 
-最终用户不需要自行安装 `frp-panel`，也不应在本机执行面板提供的 Linux 安装脚本。
+默认情况下，最终用户不需要自行安装 `frp-panel`，也不应在 macOS 上执行面板提供的 Linux 安装脚本。若你已经有可工作的命令行 Client，可以直接打开本应用，在“总览”的“系统已有 frp-panel Client”区域查看和适配它，无需重复安装。
 
 完整操作、证书例外、更新、卸载与排障见 [使用指南](docs/USER_GUIDE.md)。
 

@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import type { ConnectionConfig, LogEntry, RuntimeStatus, SidecarInfo } from "./types";
+import type {
+  ConnectionConfig,
+  ExternalClientDiscovery,
+  LogEntry,
+  RuntimeStatus,
+  SidecarInfo,
+} from "./types";
 
 export const emptyConfig = (): ConnectionConfig => ({
   client_id: "",
@@ -46,6 +52,10 @@ export function clearLogs() {
 
 export function getSidecarInfo() {
   return invoke<SidecarInfo>("get_sidecar_info");
+}
+
+export function getExternalClientDiscovery() {
+  return invoke<ExternalClientDiscovery>("get_external_client_discovery");
 }
 
 export function errorMessage(error: unknown): string {

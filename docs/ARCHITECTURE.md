@@ -11,6 +11,7 @@ Vue UI
 Tauri Rust 后端
   ├─ config：连接配置持久化
   ├─ command_parser：解析面板启动命令
+  ├─ discovery：只读发现系统二进制、外部进程和启动项
   ├─ process：sidecar 启停、日志采集、状态推导
   ├─ tray：系统托盘菜单
   └─ sidecar：选择/检查 frp-panel-client 二进制
@@ -21,6 +22,24 @@ frp-panel-client sidecar
       ▼
 frp-panel Master
 ```
+
+## 两种运行模式
+
+应用支持两种互不混淆的模式：
+
+1. **内置托管模式**：Rust 后端启动随应用打包的 `frp-panel-client` sidecar，保存其 child handle、采集 stdout/stderr、支持停止和托盘控制。这是默认模式。
+2. **外部只读观测模式**：发现用户已经通过命令行、脚本或 macOS LaunchAgent 启动的 `frp-panel client` / `frp-panel-client client`。应用只显示可安全提取的状态字段，不能附加到其 stdout/stderr，也不会停止、接管或改写它。
+
+外部进程的命令行可能包含 `-s` / `--secret`。发现逻辑只记录“是否存在 Secret 参数”，绝不复制、显示、持久化或写日志记录其值。若外部 Client 的 `client_id` 与当前 Profile 相同，`process` 模块会拒绝启动第二个内置 Client，防止向 Master 重复注册。
+
+macOS 下，`discovery` 会只读扫描用户和系统 LaunchAgent 目录：
+
+```text
+~/Library/LaunchAgents
+/Library/LaunchAgents
+```
+
+启动项存在并不代表其进程正在运行；运行状态仍以进程发现为准。应用自身的“登录后启动”LaunchAgent 不会被当作外部 `frp-panel` Client，也不会被外部发现功能修改。
 
 ## 为什么不直接用 MoonProxy
 
@@ -98,6 +117,8 @@ CLIENT_FEATURES_ENABLE_REMOTE_SHELL=false
 
 - child handle 存在：进程运行中。
 - child handle 不存在：停止或已退出。
+
+外部 Client 不进入 `AppRuntime.child`。其“正在运行”状态由操作系统进程表推导，默认每 10 秒刷新一次，也可以由用户手动刷新；这与内置 sidecar 的日志状态保持分离。
 
 日志状态作为增强信号：
 

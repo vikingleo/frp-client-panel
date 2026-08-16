@@ -9,6 +9,7 @@ Vue UI
 Rust application layer
   ├─ config.rs          配置元数据与系统凭据库
   ├─ command_parser.rs  仅解析粘贴命令，不执行 shell
+  ├─ discovery.rs       只读发现外部二进制、运行进程与启动项
   ├─ process.rs         受控启动/停止 sidecar、日志脱敏
   ├─ runtime.rs         进程状态和日志环形缓冲
   ├─ sidecar.rs         平台二进制选择与安全环境变量
@@ -67,6 +68,7 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
 | 前端数据类型 | `src/types.ts` |
 | 连接配置和凭据迁移 | `src-tauri/src/config.rs` |
 | 解析面板命令 | `src-tauri/src/command_parser.rs` |
+| 探测外部命令行 Client / LaunchAgent | `src-tauri/src/discovery.rs` |
 | 启动、停止和脱敏 | `src-tauri/src/process.rs` |
 | sidecar / 环境变量 / 目标架构 | `src-tauri/src/sidecar.rs` |
 | 运行时状态和日志 | `src-tauri/src/runtime.rs` |
@@ -84,6 +86,8 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
 5. 自签名证书例外必须是用户可见、默认关闭的显式选项。
 6. 保持 `CLIENT_FEATURES_ENABLE_FUNCTIONS=false` 和 `CLIENT_FEATURES_ENABLE_REMOTE_SHELL=false`，除非产品定义、安全评估和 UI 提示同步更新。
 7. 不扩大 Tauri shell capability；任何新增 sidecar 参数都应由 Rust 后端构造和校验。
+8. 外部进程发现只能读取非敏感字段：不得复制、显示、日志化、持久化 `-s` / `--secret` 的值。
+9. 不自动停止、接管、重启或修改外部 Client 与外部 LaunchAgent；同 Client ID 时只阻止重复启动内置 sidecar。
 
 ## 测试与本地验证
 
@@ -105,7 +109,7 @@ pnpm bundle:linux
 pnpm bundle:windows
 ```
 
-新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client` 与 `verify:bundle`。
+新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及外部发现时，至少覆盖 Client 命令识别、非 Client 命令忽略、同 ID 冲突、二进制去重，以及不返回 Secret；macOS 还应覆盖 LaunchAgent plist 解析。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client` 与 `verify:bundle`。
 
 ## 依赖与供应链
 

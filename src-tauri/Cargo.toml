@@ -27,3 +27,7 @@ tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-store = "2"
 tokio = { version = "1", features = ["macros", "process", "io-util", "time", "sync", "rt-multi-thread"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1.10.0"

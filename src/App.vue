@@ -11,6 +11,7 @@ import {
   clearLogs,
   emptyConfig,
   errorMessage,
+  getExternalClientDiscovery,
   getLogs,
   getSidecarInfo,
   getStatus,
@@ -20,7 +21,16 @@ import {
   startClient,
   stopClient,
 } from "./commands";
-import type { ConnectionConfig, LogEntry, RuntimeState, RuntimeStatus, SidecarInfo } from "./types";
+import type {
+  ConnectionConfig,
+  ExternalClientDiscovery,
+  LogEntry,
+  ObservedClientInfo,
+  RuntimeState,
+  RuntimeStatus,
+  SidecarInfo,
+  StartupItemInfo,
+} from "./types";
 
 type ViewName = "overview" | "config" | "logs" | "about";
 type BusyAction = "loading" | "parsing" | "saving" | "starting" | "stopping" | null;
@@ -36,12 +46,18 @@ const secretVisible = ref(false);
 const busyAction = ref<BusyAction>(null);
 const notice = ref<{ kind: NoticeKind; message: string } | null>(null);
 const sidecar = ref<SidecarInfo | null>(null);
+const externalDiscovery = ref<ExternalClientDiscovery>({
+  installed_binaries: [],
+  running_clients: [],
+  startup_items: [],
+});
 const hydrated = ref(false);
 const logViewport = ref<HTMLElement | null>(null);
 const unlisteners: UnlistenFn[] = [];
 const themePreference = ref<ThemePreference>("system");
 const systemPrefersDark = ref(false);
 let systemThemeQuery: MediaQueryList | null = null;
+let externalRefreshTimer: number | null = null;
 const THEME_STORAGE_KEY = "frp-panel-client.theme";
 const LEGACY_THEME_STORAGE_KEY = "frp-panel-mac-client.theme";
 
@@ -91,6 +107,12 @@ const resolvedTheme = computed<"light" | "dark">(() =>
     : themePreference.value,
 );
 const isRunning = computed(() => status.value.running);
+const currentConfigExternalClient = computed(() => {
+  const clientId = config.value.client_id.trim();
+  if (!clientId) return null;
+  return externalDiscovery.value.running_clients.find((client) => client.client_id === clientId) ?? null;
+});
+const hasExternalClientConflict = computed(() => currentConfigExternalClient.value !== null);
 const hasConfig = computed(() => {
   const value = config.value;
   return [value.client_id, value.client_secret, value.api_url, value.rpc_url].every((item) => item.trim());
@@ -183,6 +205,11 @@ function formatDuration(milliseconds: number) {
   return `${seconds}s`;
 }
 
+function formatSeconds(seconds: number | null) {
+  if (seconds == null) return "—";
+  return formatDuration(seconds * 1000);
+}
+
 function streamLabel(stream: LogEntry["stream"]) {
   if (stream === "stderr") return "错误";
   if (stream === "system") return "系统";
@@ -196,23 +223,38 @@ async function scrollLogsToEnd() {
 
 async function refreshRuntime() {
   try {
-    const [nextStatus, nextLogs, nextSidecar] = await Promise.all([getStatus(), getLogs(), getSidecarInfo()]);
+    const [nextStatus, nextLogs, nextSidecar, nextDiscovery] = await Promise.all([
+      getStatus(),
+      getLogs(),
+      getSidecarInfo(),
+      getExternalClientDiscovery(),
+    ]);
     status.value = nextStatus;
     logs.value = nextLogs;
     sidecar.value = nextSidecar;
+    externalDiscovery.value = nextDiscovery;
   } catch (error) {
     setNotice("error", errorMessage(error));
+  }
+}
+
+async function refreshExternalDiscovery(showError = false) {
+  try {
+    externalDiscovery.value = await getExternalClientDiscovery();
+  } catch (error) {
+    if (showError) setNotice("error", errorMessage(error));
   }
 }
 
 async function hydrate() {
   busyAction.value = "loading";
   try {
-    const [storedConfig, nextStatus, nextLogs, nextSidecar, launchAtLoginEnabled] = await Promise.all([
+    const [storedConfig, nextStatus, nextLogs, nextSidecar, nextDiscovery, launchAtLoginEnabled] = await Promise.all([
       loadConnection(),
       getStatus(),
       getLogs(),
       getSidecarInfo(),
+      getExternalClientDiscovery(),
       readLaunchAtLoginState(),
     ]);
     if (storedConfig) config.value = storedConfig;
@@ -220,6 +262,7 @@ async function hydrate() {
     status.value = nextStatus;
     logs.value = nextLogs;
     sidecar.value = nextSidecar;
+    externalDiscovery.value = nextDiscovery;
     hydrated.value = true;
   } catch (error) {
     setNotice("error", errorMessage(error));
@@ -289,7 +332,9 @@ async function saveConfig() {
 async function connectClient() {
   clearNotice();
   try {
-    sidecar.value = await getSidecarInfo();
+    const [nextSidecar, nextDiscovery] = await Promise.all([getSidecarInfo(), getExternalClientDiscovery()]);
+    sidecar.value = nextSidecar;
+    externalDiscovery.value = nextDiscovery;
   } catch (error) {
     setNotice("error", errorMessage(error));
     return;
@@ -298,11 +343,20 @@ async function connectClient() {
     setNotice("error", sidecar.value.hint);
     return;
   }
+  if (hasExternalClientConflict.value) {
+    const client = currentConfigExternalClient.value;
+    setNotice(
+      "info",
+      `检测到外部 frp-panel Client 正在运行（PID ${client?.pid ?? "—"}）。本应用不会重复启动相同 Client ID。`,
+    );
+    return;
+  }
   busyAction.value = "starting";
   try {
     await persistConfig();
     await startClient();
     status.value = await getStatus();
+    await refreshExternalDiscovery();
     setNotice("success", "已请求启动 frp-panel-client");
   } catch (error) {
     setNotice("error", errorMessage(error));
@@ -351,12 +405,31 @@ async function disconnectClient() {
   try {
     await stopClient();
     status.value = await getStatus();
+    await refreshExternalDiscovery();
     setNotice("success", "客户端已停止");
   } catch (error) {
     setNotice("error", errorMessage(error));
   } finally {
     busyAction.value = null;
   }
+}
+
+function importExternalConnection(source: ObservedClientInfo | StartupItemInfo) {
+  config.value = {
+    ...config.value,
+    client_id: source.client_id ?? config.value.client_id,
+    api_url: source.api_url ?? config.value.api_url,
+    rpc_url: source.rpc_url ?? config.value.rpc_url,
+  };
+  navigate("config");
+  setNotice(
+    config.value.client_secret.trim()
+      ? "success"
+      : "info",
+    config.value.client_secret.trim()
+      ? "已填入外部 Client 的非敏感连接字段；请确认后保存。"
+      : "已填入 Client ID 与 URL；为保护安全，外部进程的 Secret 不会被读取，请手动填写后保存。",
+  );
 }
 
 async function copyText(value: string, successMessage: string) {
@@ -401,11 +474,15 @@ onMounted(async () => {
     setNotice("error", `事件通道初始化失败：${errorMessage(error)}`);
   }
   await hydrate();
+  externalRefreshTimer = window.setInterval(() => {
+    void refreshExternalDiscovery();
+  }, 10_000);
 });
 
 onBeforeUnmount(() => {
   unlisteners.splice(0).forEach((unlisten) => unlisten());
   systemThemeQuery?.removeEventListener("change", handleSystemThemeChange);
+  if (externalRefreshTimer !== null) window.clearInterval(externalRefreshTimer);
 });
 
 watch(activeView, async (view) => {
@@ -543,7 +620,8 @@ watch(themePreference, (preference) => {
               v-if="!isRunning"
               type="button"
               class="button button-primary"
-              :disabled="busyAction !== null || !hasConfig || !sidecar?.available"
+              :disabled="busyAction !== null || !hasConfig || !sidecar?.available || hasExternalClientConflict"
+              :title="hasExternalClientConflict ? '相同 Client ID 的外部 Client 已在运行' : '启动内置 Client'"
               @click="connectClient"
             >
               <i v-if="busyAction === 'starting'" class="bi bi-arrow-repeat spinning" aria-hidden="true"></i>
@@ -589,6 +667,14 @@ watch(themePreference, (preference) => {
               <span class="error-strip-text">{{ lastError }}</span>
             </div>
             <button type="button" class="text-button" @click="navigate('logs')">查看日志 <i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+          </div>
+
+          <div v-if="currentConfigExternalClient" class="external-conflict-banner" role="alert">
+            <i class="bi bi-exclamation-diamond-fill" aria-hidden="true"></i>
+            <div>
+              <strong>检测到同一 Client ID 的外部 Client 正在运行</strong>
+              <span>PID {{ currentConfigExternalClient.pid }} · 本应用将保持只读观测，并阻止重复启动内置 Client。</span>
+            </div>
           </div>
 
           <div class="overview-grid">
@@ -651,6 +737,77 @@ watch(themePreference, (preference) => {
               <div><span class="metric-label">自动连接</span><strong>{{ config.auto_connect ? '已开启' : '已关闭' }}</strong></div>
             </div>
           </div>
+
+          <section class="panel external-clients-panel">
+            <div class="panel-heading">
+              <div>
+                <div class="panel-kicker">EXTERNAL CLIENT DISCOVERY</div>
+                <h2>系统已有 frp-panel Client</h2>
+              </div>
+              <button type="button" class="button button-secondary button-small" @click="refreshExternalDiscovery(true)">
+                <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                重新检测
+              </button>
+            </div>
+
+            <div class="external-safety-note">
+              <i class="bi bi-shield-check" aria-hidden="true"></i>
+              <span>这是只读发现：不会执行命令、读取外部 Secret、接管或停止外部进程。外部 Client 的日志也无法接入本应用。</span>
+            </div>
+
+            <div v-if="externalDiscovery.running_clients.length" class="external-client-list">
+              <article v-for="client in externalDiscovery.running_clients" :key="client.pid" class="external-client-card" :class="{ conflict: client.client_id === config.client_id.trim() }">
+                <div class="external-client-heading">
+                  <div>
+                    <span class="external-client-title"><i class="bi bi-terminal-fill" aria-hidden="true"></i>{{ client.binary_name }}</span>
+                    <span class="external-client-subtitle">外部进程 · PID {{ client.pid }} · 已运行 {{ formatSeconds(client.run_time_seconds) }}</span>
+                  </div>
+                  <span class="availability-badge external"><span class="status-dot"></span>只读观测</span>
+                </div>
+                <div class="external-kv-grid">
+                  <div><span>Client ID</span><code>{{ client.client_id ?? '未能读取' }}</code></div>
+                  <div><span>Secret 参数</span><code>{{ client.secret_argument_present ? '已检测（未读取）' : '未检测到' }}</code></div>
+                  <div><span>API URL</span><code>{{ client.api_url ?? '未能读取' }}</code></div>
+                  <div><span>RPC URL</span><code>{{ client.rpc_url ?? '未能读取' }}</code></div>
+                  <div class="external-path"><span>二进制路径</span><code>{{ client.binary_path ?? '系统未提供' }}</code></div>
+                </div>
+                <div class="external-client-actions">
+                  <span v-if="client.client_id === config.client_id.trim()" class="external-conflict-label">与当前 Profile 冲突，已禁止重复启动</span>
+                  <span v-else class="field-hint">可仅导入 Client ID 与 URL；Secret 需要手动填写。</span>
+                  <button type="button" class="button button-ghost button-small" @click="importExternalConnection(client)">
+                    <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                    填入安全字段
+                  </button>
+                </div>
+              </article>
+            </div>
+            <div v-else class="external-empty">
+              <i class="bi bi-terminal-x" aria-hidden="true"></i>
+              <span>没有检测到正在运行的 frp-panel Client。内置 Client 与外部 Client 都会每 10 秒重新检测。</span>
+            </div>
+
+            <div class="external-sources-grid">
+              <div class="external-source-block">
+                <div class="external-source-heading"><i class="bi bi-hdd-network" aria-hidden="true"></i><strong>已安装二进制</strong><span>{{ externalDiscovery.installed_binaries.length }}</span></div>
+                <div v-if="externalDiscovery.installed_binaries.length" class="external-source-list">
+                  <div v-for="binary in externalDiscovery.installed_binaries" :key="binary.path" class="external-source-row">
+                    <code>{{ binary.name }}</code><span>{{ binary.path }} · {{ binary.source }}</span>
+                  </div>
+                </div>
+                <p v-else>未在 PATH 和常用目录中发现 `frp-panel` / `frp-panel-client`。</p>
+              </div>
+              <div class="external-source-block">
+                <div class="external-source-heading"><i class="bi bi-rocket-takeoff" aria-hidden="true"></i><strong>已有启动项</strong><span>{{ externalDiscovery.startup_items.length }}</span></div>
+                <div v-if="externalDiscovery.startup_items.length" class="external-source-list">
+                  <div v-for="item in externalDiscovery.startup_items" :key="item.path" class="external-source-row startup-row">
+                    <div><code>{{ item.label }}</code><span>{{ item.kind }} · {{ item.client_id ?? '未能读取 Client ID' }}</span></div>
+                    <button type="button" class="text-button" @click="importExternalConnection(item)">导入安全字段</button>
+                  </div>
+                </div>
+                <p v-else>未发现由 frp-panel Client 定义的 macOS LaunchAgent。</p>
+              </div>
+            </div>
+          </section>
         </section>
 
         <section v-else-if="activeView === 'config'" class="view" aria-labelledby="config-title">
@@ -776,7 +933,7 @@ watch(themePreference, (preference) => {
                 <i v-else class="bi bi-floppy" aria-hidden="true"></i>
                 {{ busyAction === 'saving' ? '保存中' : '保存配置' }}
               </button>
-              <button type="button" class="button button-secondary" :disabled="busyAction !== null || !hasConfig || !sidecar?.available" @click="connectClient">
+              <button type="button" class="button button-secondary" :disabled="busyAction !== null || !hasConfig || !sidecar?.available || hasExternalClientConflict" @click="connectClient">
                 <i class="bi bi-play-fill" aria-hidden="true"></i>
                 保存并连接
               </button>
