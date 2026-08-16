@@ -2,9 +2,14 @@
 
 本文件记录当前 `cargo audit` 的非阻断告警。它们没有被加入忽略列表；安全 workflow 会继续显示这些结果，维护者必须在每次依赖升级时重新评估。
 
-## 2026-08-15 审查结果
+## 2026-08-16 审查结果
 
 `cargo audit --file src-tauri/Cargo.lock` 未报告已知可利用漏洞，但报告以下上游告警：
+
+本次 Dashboard 只读客户端新增 `reqwest`、`rustls` 和 `webpki-roots` 依赖路径。
+`cargo deny` 的许可证、来源与 bans 检查已通过；`webpki-roots` 使用的
+CDLA-Permissive-2.0 已在 `deny.toml` 中显式允许，并在
+`THIRD_PARTY_NOTICES.md` 中记录。
 
 | 范围 | 告警类型 | 处理原则 |
 | --- | --- | --- |

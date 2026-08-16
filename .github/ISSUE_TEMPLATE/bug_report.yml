@@ -25,6 +25,17 @@ body:
         - Windows x86_64
     validations:
       required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Operating mode
+      options:
+        - frp-panel managed Client
+        - Native frpc Client (macOS)
+        - Local frps Server (macOS)
+        - Local frps Dashboard (macOS)
+    validations:
+      required: true
   - type: textarea
     id: steps
     attributes:

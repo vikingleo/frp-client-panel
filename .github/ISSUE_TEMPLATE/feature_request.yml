@@ -19,5 +19,5 @@ body:
     attributes:
       label: Potential impact
       options:
-        - label: This may affect Client Secret handling, TLS behavior, sidecar execution, or Tauri permissions.
+        - label: This may affect Client Secret/Token handling, TLS behavior, frpc/frps sidecar execution, Dashboard access, or Tauri permissions.
         - label: I checked that this does not require executing a user-provided shell command.

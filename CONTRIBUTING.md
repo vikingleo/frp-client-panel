@@ -16,7 +16,10 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 ```bash
 pnpm verify:client
+pnpm verify:frpc
+pnpm verify:frps
 pnpm verify:bundle
+(cd src-tauri && cargo deny --config ../deny.toml check licenses bans sources)
 ```
 
 ## 贡献规则
@@ -25,7 +28,7 @@ pnpm verify:bundle
 2. 不提交 Client Secret、Token、生产 URL、私钥、日志转储、`.env` 或打包产物。
 3. 不执行或引入执行用户粘贴 shell 命令的能力。
 4. 不降低 TLS 默认校验，不在没有显式用户选择的情况下跳过证书验证。
-5. 变更用户行为时同步更新 `README.md`、`docs/USER_GUIDE.md` 和 `CHANGELOG.md`。
+5. 变更用户行为时同步更新 `README.md`、`docs/USER_GUIDE.md`、相关架构/隐私文档和 `CHANGELOG.md`。
 6. 更新 sidecar 上游 commit 时，说明来源、原因、许可证影响和四平台验证结果。
 
 ## Pull Request 内容

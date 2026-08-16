@@ -23,13 +23,15 @@ Rust 后端
 
 ## Profile 与运行模式
 
-Profile 元数据保存在 `profiles.json`。旧版单连接 `connections.json` 会在首次读取时迁移为 `panel-default` Profile；旧 Client Secret 仍在系统凭据库，绝不复制到 Profile JSON。
+Client Profile 元数据保存在 `profiles.json`；本机 Server Profile 元数据独立保存在 `servers.json`。旧版单连接 `connections.json` 会在首次读取时迁移为 `panel-default` Profile；旧 Client Secret 仍在系统凭据库，绝不复制到 Profile JSON。Server Token 与 Dashboard 密码只存在于 App 托管的 `frps.toml`。
 
 | Mode | 引擎 | 配置 | 运行边界 |
 | --- | --- | --- | --- |
 | `panel_managed` | `frp-panel-client` | Client ID、Secret、API/RPC URL | 接收 frp-panel Master 下发的配置 |
 | `native_frpc` / `managed` | 官方 `frpc` | App 私有目录中的 `frpc.toml` | 保存时可编辑；启动前强制 `frpc verify -c` |
 | `native_frpc` / `external_readonly` | 外部或 App 内置 `frpc` | 用户指定的外部路径 | App 只记录路径，不读取、修改、reload 或停止外部实例 |
+| `native_frps` / `managed` | 官方 `frps` | App 私有目录中的 `frps.toml` | 保存时可编辑；启动前强制 `frps verify -c`；可读取本机 Dashboard |
+| `native_frps` / `external_readonly` | 官方 `frps` | 用户指定的外部路径 | App 可用该路径启动自己创建的 child，但不读取、改写或查询该配置的 Dashboard |
 
 原生模式直接连接 `frpc.toml` 中配置的 frps，**不会**连接 frp-panel Master RPC。App 托管原生 Profile 的固定流程是：
 
@@ -82,7 +84,7 @@ macOS 原生 `frpc` / `frps` 由 `scripts/sync-frpc.sh` / `scripts/sync-frps.sh`
 - 面板 Client Secret 保存在系统凭据库，Rust 通过 `CLIENT_SECRET` 环境变量传给 sidecar，不出现在命令行或 `connections.json`/`profiles.json`。
 - App 托管的 `frpc.toml` 与 `frps.toml` 使用应用私有目录并在 Unix 上设为 `0600`。TOML 可能含 `auth.token`、Dashboard 密码或 OIDC Secret，用户不应将其提交、上传或分享。
 - 外部 native TOML 不读取、不复制、不写入。
-- Dashboard 查询仅读取 App 托管的 `frps.toml`，并在 Rust 后端使用 `webServer` Basic Auth；密码不会返回给 Vue、不会持久化到普通 JSON，也不会进入日志。HTTP 重定向被拒绝，HTTPS 保持证书验证。
+- Dashboard 查询仅读取 App 托管的 `frps.toml`，并在 Rust 后端使用 `webServer` Basic Auth；Dashboard 状态响应不会返回密码，凭据不会持久化到普通 Profile JSON 或进入日志。App 托管 TOML 的高级编辑器会按用户操作把配置载入本机 Vue 内存，以支持编辑。HTTP 重定向被拒绝，HTTPS 保持证书验证。
 - Dashboard 响应只映射客户端、代理、端口、连接数和流量等运行状态；不向 UI 返回完整 proxy spec、annotations 或 metadata，避免意外显示用户放入其中的敏感内容。
 - native 校验和运行日志对包含 `auth.token`、password、secret、plugin token 等典型配置行脱敏；分享日志前仍应人工检查主机、域名、端口与业务信息。
 

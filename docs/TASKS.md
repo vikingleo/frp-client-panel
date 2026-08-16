@@ -106,7 +106,7 @@
 
 ## 当前限制
 
-- 只支持一个连接 Profile。
+- 只支持一个 `frp-panel` 受管 Profile；原生 `frpc` 与本机 `frps` 可分别保存多个 Profile。
 - 不自动执行 `join-token` 注册。
 - 不做 Apple notarization。
 - 不保证 worker、remote shell、WireGuard 等高级能力在桌面图形壳里可用。

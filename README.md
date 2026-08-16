@@ -82,6 +82,8 @@ macOS 还可以直接作为 `frps` 宿主：在“本机 frps”页面导入或�
 - TLS 证书校验默认开启。仅当你确认服务端使用自签名证书时，才在配置页启用“不验证 TLS 证书”。
 - App 托管的原生 TOML 位于应用私有目录并使用用户私有权限；该 TOML 可能含 `auth.token`，因此不应提交、复制或分享到公共位置。
 - 外部原生 frpc 配置不会被应用读取、复制、修改、reload 或停止。
+- Dashboard 仅查询 App 托管的本机 frps；状态接口不会返回其密码，HTTPS Dashboard 不会关闭证书校验，也不会跟随重定向。托管 TOML 的高级编辑器会显示用户主动编辑的配置内容，因此不要在共享屏幕、截图或日志中暴露 Token 和 Dashboard 密码。
+- 外部 frps 配置仅以路径形式引用：App 可启动自己创建的 frps child，但不会读取、改写、停止或接管独立运行的外部服务，也不会查询其 Dashboard。
 - 本应用不请求 sudo，不写入 `/etc/frpp/.env`，也不执行粘贴命令中的 shell 内容。
 
 详见 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)。

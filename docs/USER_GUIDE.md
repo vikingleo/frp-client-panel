@@ -104,18 +104,19 @@ App 托管模式会把 TOML 保存到应用配置目录并设置用户私有文�
 
 服务端 Token、Dashboard 密码和其他密钥会写入托管 `frps.toml`，因此该文件使用 App 私有目录和用户私有权限。不要把它提交到 Git、截图或发送给不可信人员。
 
-Dashboard 概览只适用于 **App 托管**、且启用了 `webServer.port` 的 Server Profile。应用会在 Rust 后端读取本机私有 `frps.toml` 的 Dashboard 地址和 Basic Auth 凭据，凭据不会传给前端、写入普通 JSON 或日志。外部只读 Profile 不会被应用读取、接管或查询 Dashboard。Dashboard 采用严格 TLS 验证；如果 Dashboard 配置了自签名 HTTPS 证书，概览会提示不可用，而不会降低证书校验。
+Dashboard 概览只适用于 **App 托管**、且启用了 `webServer.port` 的 Server Profile。应用会在 Rust 后端读取本机私有 `frps.toml` 的 Dashboard 地址和 Basic Auth 凭据；Dashboard 状态响应不会回传凭据，也不会写入普通 Profile JSON 或日志。App 托管配置的高级编辑器会显示用户主动编辑的 TOML 内容，因此不要在截图、屏幕共享或问题报告中暴露 Token 和密码。外部只读 Profile 不会被应用读取、接管或查询 Dashboard。Dashboard 采用严格 TLS 验证；如果 Dashboard 配置了自签名 HTTPS 证书，概览会提示不可用，而不会降低证书校验。
 
 本机 frps 的运行状态只表示服务端进程已经启动和监听配置；Dashboard 中显示的代理状态才能反映代理是否在线。标准 token 模式使用的是服务端与客户端共享的认证信息：本版本可以生成接入模板并只读查看接入状态，但不能远程编辑、单独批准、吊销或停止其他设备上的 frpc。
 
 ## 自动启动
 
-配置页提供两个独立开关：
+配置页提供三个独立开关：
 
 - **打开应用时自动连接**：启动桌面应用后立即拉起 Client。
 - **登录后启动应用**：使用当前系统的自动启动机制，使应用登录后常驻托盘。
+- **打开 App 后自动启动 frps**：只对当前 Server Profile 生效；应用启动后会先校验该 `frps.toml`，再启动 App 自己管理的服务端 child。
 
-关闭第二个开关会移除应用设置的自动启动项，但不会改动你手工创建的其他系统服务或发现到的 `frp-panel` LaunchAgent。已经使用外部 LaunchAgent 自启的 Client 无需开启本应用的“打开应用时自动连接”；否则相同 Client ID 会被应用安全地识别并避免重复拉起。
+关闭第二个开关会移除应用设置的自动启动项，但不会改动你手工创建的其他系统服务或发现到的 `frp-panel` LaunchAgent。已经使用外部 LaunchAgent 自启的 Client 无需开启本应用的“打开应用时自动连接”；否则相同 Client ID 会被应用安全地识别并避免重复拉起。外部独立运行的 `frps` 不会被 App 停止、重启或接管。
 
 ## TLS 证书与自签名部署
 
@@ -140,7 +141,7 @@ Dashboard 概览只适用于 **App 托管**、且启用了 `webServer.port` 的 
 
 ### 卸载
 
-- macOS：退出应用后删除“应用程序”中的 App；如不再需要连接信息，请在系统钥匙串中删除 `app.frppanel.client` / `client-secret`。
+- macOS：退出应用后删除“应用程序”中的 App；如不再需要连接信息，请在系统钥匙串中删除 `app.frppanel.client` / `client-secret`，并删除应用配置目录中的托管 `frpc.toml` / `frps.toml`。
 - Linux：删除 AppImage；如不再需要连接信息，请在 Secret Service 和应用配置目录中移除相应条目。
 - Windows：在“已安装的应用”中卸载；如不再需要连接信息，请在 Windows Credential Manager 中删除对应凭据。
 
@@ -153,6 +154,8 @@ Dashboard 概览只适用于 **App 托管**、且启用了 `webServer.port` 的 
 | Client 已注册但没有隧道 | 在 frp-panel Web UI 检查该 Client 是否已分配配置 |
 | 保存后提示找不到 Secret | 重新粘贴命令并保存，确认系统凭据库可用 |
 | App 启动但不自动连接 | 分别检查“打开应用时自动连接”和“登录后启动应用”开关 |
+| frps 启动后其他设备无法接入 | 检查 `bindAddr`、`bindPort`、macOS 防火墙、路由/NAT/IPv6/VPN 可达性，以及客户端的 Token/TLS 设置 |
+| Dashboard 暂不可用 | 确认 Server Profile 为 App 托管、配置存在 `webServer.port`、Dashboard 用户名/密码正确且 `frps` 正在运行；自签名 HTTPS Dashboard 不会被 App 跳过证书校验 |
 | Windows/macOS 拦截安装包 | 确认从官方 Release 下载并核验哈希；测试版未签名时可能出现系统警告 |
 
 仍无法解决时，按 [SUPPORT.md](../SUPPORT.md) 提供系统版本、CPU 架构、安装包类型和脱敏日志。

@@ -1,13 +1,14 @@
-# frp-panel Client 开发计划
+# FRP Desktop Client 开发计划
 
 ## 目标
 
-开发一个面向 macOS、Linux 与 Windows 的 `frp-panel` 图形客户端，提供托盘常驻和桌面主窗口。客户端不重写 `frp-panel` 协议，通过 Tauri sidecar 管理上游、目标平台的 `frp-panel-client` 二进制。应用解析面板生成的 `client -s ... -i ... --api-url ... --rpc-url ...` 命令，但运行时将 Secret 通过环境变量传递，避免出现在进程参数中。
+开发一个面向 macOS、Linux 与 Windows 的 FRP 图形运行壳，提供托盘常驻和桌面主窗口。应用包含三个彼此独立的运行面：`frp-panel` 受管 Client、macOS 原生 `frpc` Client，以及本机原生 `frps` Server。应用不重写 `frp-panel` 或标准 FRP 协议，通过受限 Tauri sidecar 管理上游引擎；Dashboard 只读取本机托管 `frps` 的运行状态。
 
 ## 非目标
 
-- 不做 `frp-panel` Master / Server 管理端。
-- 不在第一版实现标准 `frpc.toml` 手工隧道编辑；这是 MoonProxy 的主要能力，不是本项目核心。
+- 不做 `frp-panel` Master Web 管理端，也不把本应用扩展为远程 `frpc` 控制中心。
+- 支持本机 `frps` 的配置、生命周期、接入模板和只读 Dashboard；不远程下发或修改其他设备的 `frpc` 配置。
+- 不提供完整的所有标准 FRP proxy/plugin/visitor 图形表单；保留 TOML 高级编辑器和常用 TCP/UDP/HTTP/HTTPS 起始生成器。
 - 不默认安装 LaunchDaemon、systemd 或写 `/etc/frpp/.env`。
 - 不在第一版实现 `join-token` 自动注册。原因是 `frp-panel join` 当前会保存到 `/etc/frpp/.env`，在 macOS 桌面应用里需要额外权限与安全设计。
 - 不重写 frp 协议、gRPC 协议、远程 shell、worker 或 WireGuard 能力。
@@ -43,6 +44,17 @@
 5. 后端采集 stdout/stderr，推导连接状态并向前端推送事件。
 6. 用户关闭窗口时应用隐藏到状态栏，进程继续运行；从菜单可显示窗口或断开连接。
 
+标准原生模式：
+
+1. 用户导入或生成 `frpc.toml`，Rust 后端先执行固定参数的 `frpc verify -c`。
+2. 校验通过后启动官方 `frpc -c`，并采集脱敏日志。
+
+本机服务端模式：
+
+1. 用户导入或生成 `frps.toml`，Rust 后端先执行固定参数的 `frps verify -c`。
+2. 校验通过后启动官方 `frps -c`，并通过独立运行时管理服务端进程和日志。
+3. 对 App 托管配置，Rust 后端读取 `webServer` 的地址和 Basic Auth 凭据，调用 Dashboard v2 只读接口，最小化映射客户端、代理、连接数和流量状态。
+
 ## 状态定义
 
 - `stopped`：未启动 sidecar。
@@ -50,11 +62,13 @@
 - `running`：进程仍在运行，并观测到连接/拉取配置相关成功日志。
 - `error`：启动失败、进程异常退出，或日志出现明确错误。
 
-第一版状态以进程存活和日志关键词推导，不直接调用 `frp-panel` 内部 API。后续可扩展 gRPC/HTTP 健康检查。
+面板 Client 状态以进程存活和日志关键词推导，不直接调用 `frp-panel` 内部 API。原生 `frpc` / `frps` 状态以受控 child 生命周期为准；本机 `frps` 若启用 Dashboard，还额外显示实际客户端和代理状态。
 
 ## 安全与凭据
 
 - 非敏感连接元数据保存在本机应用配置目录；Client secret 只保存在系统凭据库，不上传到第三方服务。
+- App 托管的 `frpc.toml` / `frps.toml` 保存在应用私有目录，Unix 上设置为 `0600`；其中的 Token、Dashboard 密码和其他密钥不会写入 Profile JSON。
+- Dashboard 状态接口只在 Rust 后端使用 `webServer` Basic Auth，响应中不含凭据，也不会写入日志或诊断输出；用户主动打开 App 托管 TOML 的高级编辑器时，配置内容会暂存于本机 UI 内存。外部只读 TOML 不会被读取。
 - 首次加载旧版本明文 `connections.json` 时，将 Secret 迁移到系统凭据库并清理原字段；凭据库写入失败时不回退到明文存储。
 - UI 默认隐藏 secret。
 - 日志展示会对当前 secret 做脱敏。
@@ -64,6 +78,7 @@
 - 默认注入环境变量关闭非核心能力：
   - `CLIENT_FEATURES_ENABLE_FUNCTIONS=false`
   - `CLIENT_FEATURES_ENABLE_REMOTE_SHELL=false`
+- Dashboard HTTP 客户端禁止重定向；HTTPS Dashboard 始终验证证书，不提供不安全例外开关。
 
 ## 启动策略
 
@@ -84,6 +99,7 @@
 - 日志页：实时日志、清空日志、复制日志。
 - 关于页：sidecar 状态、下载提示、项目说明。
 - 状态栏菜单：显示窗口、连接/断开、退出。
+- 本机 frps 页：Server Profile、服务端启动/停止、配置向导、客户端接入模板、Dashboard 状态和日志。
 
 ## 里程碑
 
@@ -122,6 +138,13 @@
 - `cargo check` 或 `pnpm tauri build`。
 - 代码格式检查。
 
+### M6：原生 FRP 与本机服务端
+
+- 提供 macOS 官方 `frpc` / `frps` sidecar，并对固定版本、SHA-256、架构和 bundle 做验证。
+- 支持多个原生 Client Profile 和独立 Server Profile。
+- 让本机 `frps` 生成客户端接入配置，并从 Dashboard v2 只读展示客户端、代理和流量。
+- 明确共享 Token 模式的边界：它不等同于客户端级授权、吊销或远程配置。
+
 ## 跨平台交付
 
 - macOS：Apple Silicon 与 Intel 的 `.app/.dmg`。
@@ -137,4 +160,6 @@
 - 应用能实时显示日志，并对 secret 脱敏。
 - 系统托盘菜单可以显示窗口、连接/断开、退出。
 - 每个平台仅打包该目标所需的 sidecar。
+- macOS `.app` 包含匹配架构的 `frpc` 和 `frps` sidecar；包验证必须覆盖两者。
+- 本机 `frps` 能通过官方 `frps verify` 启动，并能在测试 `frpc` 接入后展示 Dashboard 客户端和代理状态。
 - 文档明确说明如何准备各目标 sidecar、如何从面板复制命令、如何运行开发环境。
