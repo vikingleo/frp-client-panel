@@ -244,6 +244,158 @@ button:disabled {
   padding: 0 11px 9px;
 }
 
+.profile-sidebar {
+  display: grid;
+  gap: 8px;
+  margin: 20px 4px 0;
+}
+
+.profile-sidebar .sidebar-section-label {
+  padding: 0 7px;
+}
+
+.profile-sidebar select,
+.profile-strip select,
+.field select,
+textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  color: var(--text);
+  background: var(--surface-input);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.profile-quick-actions,
+.profile-strip,
+.profile-strip-actions,
+.form-actions,
+.external-grid,
+.native-builder,
+.native-import {
+  display: flex;
+  align-items: center;
+}
+
+.profile-quick-actions {
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.profile-strip {
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 16px 20px;
+}
+
+.profile-strip-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.profile-strip-actions select {
+  width: min(260px, 100%);
+}
+
+.mode-badge {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.mode-badge.native {
+  border-color: var(--success-border);
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.mode-badge.panel {
+  color: var(--blue);
+  background: rgba(125, 185, 255, 0.08);
+}
+
+.native-editor,
+.native-builder {
+  display: grid;
+  gap: 18px;
+}
+
+.native-import {
+  align-items: flex-end;
+  gap: 14px;
+  padding: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.native-import .field {
+  flex: 1;
+}
+
+.native-builder {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.native-builder .panel-heading {
+  margin-bottom: 0;
+}
+
+.code-area {
+  min-height: 270px;
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.form-actions {
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 4px;
+}
+
+.external-grid {
+  align-items: stretch;
+  gap: 14px;
+}
+
+.external-grid > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.external-grid.minor {
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .profile-strip,
+  .external-grid,
+  .native-import {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-strip-actions {
+    justify-content: flex-start;
+  }
+}
+
 .navigation {
   display: grid;
   gap: 4px;

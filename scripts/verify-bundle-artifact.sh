@@ -36,12 +36,15 @@ case "${target_triple}" in
     app_path="${bundle_root}/macos/frp-panel Client.app"
     dmg_path="$(first_matching_file "${bundle_root}/dmg" '*.dmg')"
     sidecar_path="${app_path}/Contents/MacOS/frp-panel-client"
+    native_frpc_path="${app_path}/Contents/MacOS/frpc"
 
     [[ -d "${app_path}" ]] || { printf 'macOS app bundle is missing: %s\n' "${app_path}" >&2; exit 1; }
     [[ -f "${sidecar_path}" ]] || { printf 'Bundled macOS sidecar is missing: %s\n' "${sidecar_path}" >&2; exit 1; }
+    [[ -f "${native_frpc_path}" ]] || { printf 'Bundled macOS frpc is missing: %s\n' "${native_frpc_path}" >&2; exit 1; }
+    file "${native_frpc_path}" | grep -Eq 'Mach-O 64-bit executable (arm64|x86_64)'
     [[ -n "${dmg_path}" && -s "${dmg_path}" ]] || { printf 'macOS DMG is missing or empty.\n' >&2; exit 1; }
     codesign --verify --deep --strict "${app_path}"
-    printf 'Verified macOS app, embedded sidecar, and DMG: %s\n' "${dmg_path}"
+    printf 'Verified macOS app, embedded sidecars, and DMG: %s\n' "${dmg_path}"
     ;;
   x86_64-unknown-linux-gnu)
     appimage_path="$(first_matching_file "${bundle_root}/appimage" '*.AppImage')"

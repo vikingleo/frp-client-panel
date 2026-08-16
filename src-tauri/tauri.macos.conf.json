@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "externalBin": [
+      "binaries/frp-panel-client",
+      "binaries/frpc"
+    ]
+  }
+}

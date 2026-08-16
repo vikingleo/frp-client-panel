@@ -4,6 +4,9 @@ import type {
   ConnectionConfig,
   ExternalClientDiscovery,
   LogEntry,
+  NativeConfigSource,
+  Profile,
+  ProfileSummary,
   RuntimeStatus,
   SidecarInfo,
 } from "./types";
@@ -22,6 +25,38 @@ export function loadConnection() {
   return invoke<ConnectionConfig | null>("load_connection");
 }
 
+export function listProfiles() {
+  return invoke<ProfileSummary[]>("list_profiles");
+}
+
+export function loadProfile(profileId?: string) {
+  return invoke<Profile | null>("load_profile", { profileId });
+}
+
+export function selectProfile(profileId: string) {
+  return invoke<void>("select_profile", { profileId });
+}
+
+export function saveNativeProfile(options: {
+  profileId?: string;
+  name: string;
+  configPath: string;
+  source: NativeConfigSource;
+  autoConnect: boolean;
+  launchAtLogin: boolean;
+  importedContent?: string;
+}) {
+  return invoke<Profile>("save_native_profile", options);
+}
+
+export function loadManagedNativeConfig(profileId: string) {
+  return invoke<string>("load_managed_native_config", { profileId });
+}
+
+export function deleteProfile(profileId: string) {
+  return invoke<void>("delete_profile", { profileId });
+}
+
 export function saveConnection(config: ConnectionConfig) {
   return invoke<void>("save_connection", { config });
 }
@@ -32,6 +67,10 @@ export function parsePanelCommand(command: string) {
 
 export function startClient() {
   return invoke<void>("start_client");
+}
+
+export function startNativeProfile(profileId?: string) {
+  return invoke<void>("start_native_profile", { profileId });
 }
 
 export function stopClient() {

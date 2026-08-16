@@ -2,14 +2,19 @@
 
 ## 适用对象与前提
 
-本应用仅用于已经部署 `frp-panel` 服务端、并能从其 Web UI 获取 Client 启动命令的用户。它不是标准 frp 客户端的图形化编辑器，也不能直接管理普通 `frpc.toml`。
+本应用有两个彼此隔离的模式：`frp-panel` 受管 Client 模式，以及 macOS 上的标准原生 `frpc` 模式。前者适用于从 frp-panel Web UI 获得启动命令的用户；后者直接运行官方 `frpc` 与 `frpc.toml`，连接配置中的 `frps`。
 
 安装前请准备：
 
 1. 与电脑架构匹配的安装包。
+
+如果使用 **frp-panel 受管 Client** 模式，还需要：
+
 2. frp-panel Web UI 生成的 Client 命令。
 3. 可访问的 API URL 与 RPC URL。
 4. 服务端的有效 TLS 证书；如使用自签名证书，需要理解并主动接受 TLS 例外风险。
+
+如果使用 **原生 frpc** 模式，还需要一份已确认可用的 TOML，或在应用中使用常用代理生成器创建 TOML。App 托管模式会自带 frpc，无需预先安装。
 
 ## 安装
 
@@ -75,6 +80,17 @@ frp-panel client -s <secret> -i <client-id> --api-url <api-url> --rpc-url <rpc-u
 你可以点击“填入安全字段”将 Client ID、API URL、RPC URL 复制到桌面应用的配置页。外部 Client 的 Secret **不会被读取、显示或导入**，因此仍需手工填写 Secret 后才能改用内置托管模式。
 
 外部 Client 始终由原有命令、脚本或 LaunchAgent 管理：桌面应用不能读取它的 stdout/stderr，不能停止、重启、接管或修改它。若外部 Client 与当前 Profile 使用同一 Client ID，应用会禁用“连接客户端”并在后端再次阻止启动，以避免重复注册到 frp-panel Master。
+
+## 原生 frpc 模式（macOS）
+
+1. 打开“配置”，点击“+ frpc”。
+2. 选择“导入到 App 私有副本”，导入一份 `frpc.toml`，或使用常用代理生成器生成 TCP、UDP、HTTP、HTTPS 的起始 TOML。
+3. 保存 Profile 后点击“校验并启动 frpc”。应用先运行 `frpc verify -c`；校验通过才会运行 `frpc -c`。
+4. 在总览或日志页观察 App 托管的 frpc 进程。
+
+App 托管模式会把 TOML 保存到应用配置目录并设置用户私有文件权限。TOML 内可能包含 `auth.token`，请勿提交到 Git、截图或共享给不可信人员。
+
+如果你已经通过命令或 LaunchAgent 运行 `frpc -c /path/frpc.toml`，总览会只读显示它的 PID、二进制、配置路径和运行时长。应用不读取配置内容、Token、TLS 私钥或插件 Secret，也不会执行 reload、stop 或改写外部配置。相同配置路径的外部 frpc 正在运行时，应用会阻止启动第二个托管实例。
 
 ## 自动启动
 

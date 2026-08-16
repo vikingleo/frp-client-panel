@@ -3,9 +3,15 @@ use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
 
 use command_parser::parse_panel_command;
-use config::{load_connection, save_connection};
+use config::{
+    delete_profile, list_profiles, load_connection, load_managed_native_config, load_profile,
+    save_connection, save_native_profile, select_profile,
+};
 use discovery::get_external_client_discovery;
-use process::{clear_logs, get_logs, get_status, start_client, stop_client};
+use process::{
+    clear_logs, get_logs, get_status, start_client, start_client_inner, start_native_profile,
+    start_native_profile_inner, stop_client,
+};
 use runtime::AppRuntime;
 use sidecar::get_sidecar_info;
 use tray::init_tray;
@@ -43,15 +49,36 @@ pub fn run() {
             init_tray(app.handle())?;
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Ok(Some(config)) = config::load_connection_inner(&app_handle) {
-                    if config.auto_connect {
-                        if let Some(runtime) = app_handle.try_state::<AppRuntime>() {
-                            let _ = process::start_client_inner(
-                                app_handle.clone(),
-                                runtime.inner(),
-                                config,
-                            )
-                            .await;
+                if let Ok(Some(profile)) = load_profile(app_handle.clone(), None) {
+                    if let Some(runtime) = app_handle.try_state::<AppRuntime>() {
+                        match profile.mode {
+                            types::ClientMode::PanelManaged => {
+                                if let Some(config) =
+                                    profile.panel.filter(|config| config.auto_connect)
+                                {
+                                    let _ = start_client_inner(
+                                        app_handle.clone(),
+                                        runtime.inner(),
+                                        config,
+                                    )
+                                    .await;
+                                }
+                            }
+                            types::ClientMode::NativeFrpc => {
+                                if profile
+                                    .native
+                                    .as_ref()
+                                    .map(|native| native.auto_connect)
+                                    .unwrap_or(false)
+                                {
+                                    let _ = start_native_profile_inner(
+                                        app_handle.clone(),
+                                        runtime.inner(),
+                                        profile,
+                                    )
+                                    .await;
+                                }
+                            }
                         }
                     }
                 }
@@ -61,8 +88,15 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             save_connection,
             load_connection,
+            list_profiles,
+            load_profile,
+            load_managed_native_config,
+            select_profile,
+            save_native_profile,
+            delete_profile,
             parse_panel_command,
             start_client,
+            start_native_profile,
             stop_client,
             get_status,
             get_logs,

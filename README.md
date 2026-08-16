@@ -1,8 +1,8 @@
 # frp-panel Client
 
-面向 macOS、Linux 与 Windows 的 `frp-panel` 受管 Client 桌面工具。它提供桌面窗口、系统托盘、运行状态和实时日志，并在本机启动与平台匹配的 `frp-panel-client` sidecar。
+面向 macOS、Linux 与 Windows 的 FRP 桌面运行壳。它提供桌面窗口、系统托盘、运行状态和实时日志，可在本机启动 `frp-panel-client` 受管 Client；macOS 另提供官方 `frpc` 的原生模式。
 
-> 社区维护的第三方项目，**不是** VaalaCat/frp-panel 官方发布的软件，也不是通用 `frpc.toml` 编辑器。
+> 社区维护的第三方项目，**不是** VaalaCat/frp-panel 官方发布的软件。原生 frpc 模式是运行器优先的配置工具，不承诺替代官方完整配置参考。
 
 ## 项目基础信息
 
@@ -12,11 +12,12 @@
 | 支持平台 | macOS Apple Silicon / Intel、Linux x86_64、Windows x86_64 |
 | 发布物 | macOS `.dmg`、Linux `.AppImage`、Windows NSIS `.exe` 安装程序 |
 | 桌面技术栈 | Vue 3、Tauri v2、Rust |
-| 受管 Client | 从固定上游 commit 构建的 `frp-panel-client` sidecar |
-| Profile | 当前仅支持一个连接 Profile |
+| frp-panel 引擎 | 从固定上游 commit 构建的 `frp-panel-client` sidecar |
+| 原生 frp 引擎 | macOS 内嵌、SHA-256 校验的官方 `frpc v0.71.0` sidecar |
+| Profile | 支持一个面板 Profile 与多个原生 `frpc` Profile，可切换 |
 | 网络遥测 | 不包含分析、广告 SDK 或自动崩溃报告上传 |
 
-`frp-panel` sidecar 的上游来源、固定 commit、许可证和源码获取方式见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+两个 sidecar 的上游来源、固定版本/commit、校验和与许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 它解决什么问题
 
@@ -36,19 +37,23 @@ frp-panel client \
 
 MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目所需的 `frp-panel` 受管 Client 协议。
 
+从本版本起，本应用也可作为标准 `frpc` 的 macOS 运行壳：导入或生成 App 托管的 `frpc.toml`，启动前执行 `frpc verify -c`，再使用官方 sidecar 执行 `frpc -c`。此模式直接连接配置中的 `frps`，**不会**连接或使用 frp-panel Master RPC。
+
 ## 功能范围
 
 - 粘贴并解析 `frp-panel client ...` 或包含 `curl | bash ... client ...` 的安装命令。
-- 保存一个连接 Profile，并启动、停止、自动重连受管 Client。
+- 保存并切换多个 Profile：frp-panel 受管 Profile 与原生 `frpc` Profile 分离。
+- macOS 原生 `frpc`：导入 TOML 到应用私有目录、启动前校验、启动/停止、日志与状态栏控制。
+- 原生模式提供 TCP、UDP、HTTP、HTTPS 的单代理 TOML 起始配置生成器；高级字段保留在 TOML 编辑器中。
 - 在系统托盘常驻，支持登录后启动应用。
 - 显示 stdout、stderr 和系统状态日志。
 - 校验内嵌 sidecar 是否与当前系统、CPU 架构匹配。
-- 只读发现系统已安装、已运行及已设置启动项的 `frp-panel` / `frp-panel-client`；可导入 Client ID、API URL、RPC URL 等非敏感字段。
+- 只读发现系统已安装、已运行及已设置启动项的 `frp-panel` / `frp-panel-client` 与 `frpc`；原生 `frpc` 只显示 PID、二进制与 `-c/--config` 路径，不读取配置内容或密钥。
 - 将 Client Secret 保存到 macOS Keychain、Windows Credential Manager 或 Linux Secret Service。
 - 默认校验 HTTPS / WSS 证书；自签名证书只能由用户明确启用例外。
 - 默认禁用上游 sidecar 的 functions 与 remote shell 功能。
 
-不包含：多 Profile、join-token 自动注册、`frpc.toml` 编辑器、worker/remote shell/WireGuard 的专用图形配置。
+不包含：join-token 自动注册、完整的所有 frp proxy/plugin/visitor 图形表单、外部 `frpc` 接管/重载、worker/remote shell/WireGuard 专用图形配置。
 
 ## 快速开始
 
@@ -58,7 +63,7 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 4. 检查 Client ID、API URL、RPC URL，保存后点击“保存并连接”。
 5. 在“日志”页面确认 Client 已注册并拉取配置。
 
-默认情况下，最终用户不需要自行安装 `frp-panel`，也不应在 macOS 上执行面板提供的 Linux 安装脚本。若你已经有可工作的命令行 Client，可以直接打开本应用，在“总览”的“系统已有 frp-panel Client”区域查看和适配它，无需重复安装。
+默认情况下，最终用户不需要自行安装 `frp-panel` 或 `frpc`。若你已经有可工作的命令行 Client，可以直接打开本应用，在“总览”的外部进程区域查看它，无需重复安装；外部实例始终由原命令或 LaunchAgent 管理。
 
 完整操作、证书例外、更新、卸载与排障见 [使用指南](docs/USER_GUIDE.md)。
 
@@ -68,6 +73,8 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 - 启动 sidecar 时，Secret 通过子进程环境变量传递，不出现在 sidecar 命令行参数中。
 - 应用显示日志时会对当前 Secret 脱敏；分享日志前仍需手动检查 Client ID、域名和其他运行信息。
 - TLS 证书校验默认开启。仅当你确认服务端使用自签名证书时，才在配置页启用“不验证 TLS 证书”。
+- App 托管的原生 TOML 位于应用私有目录并使用用户私有权限；该 TOML 可能含 `auth.token`，因此不应提交、复制或分享到公共位置。
+- 外部原生 frpc 配置不会被应用读取、复制、修改、reload 或停止。
 - 本应用不请求 sudo，不写入 `/etc/frpp/.env`，也不执行粘贴命令中的 shell 内容。
 
 详见 [PRIVACY.md](PRIVACY.md) 和 [SECURITY.md](SECURITY.md)。
@@ -79,6 +86,7 @@ MoonProxy 面向标准 `frpc` 与 `frpc.toml`；它不能直接替代本项目�
 ```bash
 pnpm install --frozen-lockfile
 pnpm sync:client
+pnpm sync:frpc
 pnpm tauri dev
 
 pnpm build

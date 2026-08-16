@@ -10,19 +10,19 @@ Rust application layer
   ├─ config.rs          配置元数据与系统凭据库
   ├─ command_parser.rs  仅解析粘贴命令，不执行 shell
   ├─ discovery.rs       只读发现外部二进制、运行进程与启动项
-  ├─ process.rs         受控启动/停止 sidecar、日志脱敏
+  ├─ process.rs         受控启动/停止 panel/frpc sidecar、日志脱敏与 native verify
   ├─ runtime.rs         进程状态和日志环形缓冲
-  ├─ sidecar.rs         平台二进制选择与安全环境变量
+  ├─ sidecar.rs         平台二进制选择、panel 安全环境变量与 frpc sidecar
   └─ tray.rs            系统托盘
   │
   ▼
-frp-panel-client sidecar
+frp-panel-client sidecar / official frpc sidecar
   │ API / RPC
   ▼
 frp-panel Master
 ```
 
-桌面应用不重新实现 frp-panel 的受管 Client 协议。协议兼容性由上游 `frp-panel-client` 负责；本项目的职责是安全地管理该进程和本地用户体验。
+桌面应用不重新实现 frp-panel 的受管 Client 协议。协议兼容性由上游 `frp-panel-client` 负责；原生模式不重新实现 frp，而是管理官方 `frpc`。本项目的职责是安全地管理进程和本地用户体验。
 
 ## 工具链
 
@@ -45,6 +45,7 @@ git clone git@github.com:vikingleo/frp-client-panel.git
 cd frp-client-panel
 pnpm install --frozen-lockfile
 pnpm sync:client
+pnpm sync:frpc
 pnpm tauri dev
 ```
 
@@ -55,6 +56,10 @@ FRP_PANEL_TARGET_TRIPLE=aarch64-apple-darwin pnpm sync:client
 FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:client
 FRP_PANEL_TARGET_TRIPLE=x86_64-unknown-linux-gnu pnpm sync:client
 FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
+
+# 官方原生 frpc 目前仅随 macOS bundle 提供
+FRP_PANEL_TARGET_TRIPLE=aarch64-apple-darwin pnpm sync:frpc
+FRP_PANEL_TARGET_TRIPLE=x86_64-apple-darwin pnpm sync:frpc
 ```
 
 构建脚本固定上游 commit `1a58b856d7de19de8669b7072872986d2fa1604a`。更新上游版本时，必须在原生 macOS Intel、macOS Apple Silicon、Linux x86_64 和 Windows x86_64 runner 上重新验证。
@@ -70,6 +75,7 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
 | 解析面板命令 | `src-tauri/src/command_parser.rs` |
 | 探测外部命令行 Client / LaunchAgent | `src-tauri/src/discovery.rs` |
 | 启动、停止和脱敏 | `src-tauri/src/process.rs` |
+| Profile 迁移、Keychain 与托管 TOML | `src-tauri/src/config.rs` |
 | sidecar / 环境变量 / 目标架构 | `src-tauri/src/sidecar.rs` |
 | 运行时状态和日志 | `src-tauri/src/runtime.rs` |
 | 系统托盘 | `src-tauri/src/tray.rs` |
@@ -88,6 +94,8 @@ FRP_PANEL_TARGET_TRIPLE=x86_64-pc-windows-msvc pnpm sync:client
 7. 不扩大 Tauri shell capability；任何新增 sidecar 参数都应由 Rust 后端构造和校验。
 8. 外部进程发现只能读取非敏感字段：不得复制、显示、日志化、持久化 `-s` / `--secret` 的值。
 9. 不自动停止、接管、重启或修改外部 Client 与外部 LaunchAgent；同 Client ID 时只阻止重复启动内置 sidecar。
+10. 原生 Profile 启动前必须执行固定参数的 `frpc verify -c <配置>`；前端不可传入任意 shell 命令或二进制路径。
+11. App 托管原生配置只写 TOML、设置 0600 权限；外部原生配置仅保存其路径，不读写内容或 Secret。
 
 ## 测试与本地验证
 
@@ -98,6 +106,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo test --manifest-path src-tauri/Cargo.toml
 
 pnpm verify:client
+pnpm verify:frpc
 pnpm verify:bundle
 ```
 
@@ -109,7 +118,7 @@ pnpm bundle:linux
 pnpm bundle:windows
 ```
 
-新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及外部发现时，至少覆盖 Client 命令识别、非 Client 命令忽略、同 ID 冲突、二进制去重，以及不返回 Secret；macOS 还应覆盖 LaunchAgent plist 解析。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client` 与 `verify:bundle`。
+新增功能至少应补充：Rust 单元测试、前端类型检查、失败路径测试和一条不含真实 Secret 的手工验证记录。涉及外部发现时，至少覆盖 Client 命令识别、非 Client 命令忽略、同 ID/配置路径冲突、二进制去重，以及不返回 Secret；macOS 还应覆盖 LaunchAgent plist 解析。涉及 sidecar 或打包时，必须运行相应平台的 `verify:client`、`verify:frpc` 与 `verify:bundle`。
 
 ## 依赖与供应链
 

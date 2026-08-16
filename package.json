@@ -25,6 +25,8 @@
     "tauri": "tauri",
     "sync:client": "bash scripts/sync-frp-panel-client.sh",
     "verify:client": "bash scripts/verify-frp-panel-client.sh",
+    "sync:frpc": "bash scripts/sync-frpc.sh",
+    "verify:frpc": "bash scripts/verify-frpc.sh",
     "verify:bundle": "bash scripts/verify-bundle-artifact.sh",
     "checksums": "node scripts/generate-checksums.mjs",
     "audit:js": "pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org",

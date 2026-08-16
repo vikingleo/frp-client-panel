@@ -20,6 +20,23 @@ The corresponding source code can be obtained by cloning the upstream
 repository and checking out the pinned revision above. The same build command
 is documented in `scripts/sync-frp-panel-client.sh` and `docs/DEVELOPMENT.md`.
 
+## fatedier/frp
+
+- Component: official `frpc` sidecar for native-frp Profiles.
+- Source repository: `fatedier/frp`.
+- Pinned version: `v0.71.0`.
+- macOS source assets:
+  - `frp_0.71.0_darwin_arm64.tar.gz`
+    - SHA-256: `45be02b186860d375ed49a8941ae9569628a54bf14e67fc36b29c98c99dabcc6`
+  - `frp_0.71.0_darwin_amd64.tar.gz`
+    - SHA-256: `1b1b4e2f1836e21e8733f1dddaacd4ed9ae67d7dbee39046b9d7b7eda6253637`
+- Acquisition and verification: `scripts/sync-frpc.sh` downloads a pinned
+  official archive, verifies the archive SHA-256 before extraction, and copies
+  only the `frpc` executable into the Tauri sidecar directory.
+- License: Apache License 2.0; the official source archive contains the
+  corresponding license text.
+- Local modifications: none.
+
 ## Tauri, Vue, Rust crates, npm packages, and system libraries
 
 The desktop shell depends on Tauri, Vue, Rust crates, npm packages, and native
@@ -30,6 +47,7 @@ machine-readable dependency inventory.
 
 ## Trademark and affiliation notice
 
-`frp-panel` and `frp-panel-client` identify the upstream project. This project
-is an independent community desktop client and is not affiliated with, endorsed
-by, or supported by the upstream maintainers unless they explicitly state so.
+`frp`, `frp-panel`, and `frp-panel-client` identify their respective upstream
+projects. This project is an independent community desktop client and is not
+affiliated with, endorsed by, or supported by the upstream maintainers unless
+they explicitly state so.

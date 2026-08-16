@@ -15,6 +15,7 @@ src-tauri/gen/
 
 # Temporary sidecar downloads
 src-tauri/binaries/.frp-panel-client-*.download.*
+src-tauri/binaries/.frpc-*.extract.*
 
 # Local configuration and secrets
 .env

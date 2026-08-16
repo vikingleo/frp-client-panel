@@ -18,6 +18,11 @@
           "name": "binaries/frp-panel-client",
           "sidecar": true,
           "args": false
+        },
+        {
+          "name": "binaries/frpc",
+          "sidecar": true,
+          "args": false
         }
       ]
     },

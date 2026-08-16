@@ -10,10 +10,12 @@ use tauri::State;
 use crate::command_parser::{parse_safe_client_command_tokens, SafeClientCommand};
 use crate::runtime::AppRuntime;
 use crate::types::{
-    ExternalBinaryInfo, ExternalClientDiscovery, ObservedClientInfo, StartupItemInfo,
+    ExternalBinaryInfo, ExternalClientDiscovery, NativeStartupItemInfo, ObservedClientInfo,
+    ObservedNativeFrpcInfo, StartupItemInfo,
 };
 
 const CLIENT_BINARY_NAMES: [&str; 2] = ["frp-panel", "frp-panel-client"];
+const NATIVE_FRPC_BINARY_NAME: &str = "frpc";
 
 #[tauri::command]
 pub fn get_external_client_discovery(runtime: State<'_, AppRuntime>) -> ExternalClientDiscovery {
@@ -25,7 +27,27 @@ pub fn discover_external_clients(excluded_pid: Option<u32>) -> ExternalClientDis
         installed_binaries: discover_installed_binaries(),
         running_clients: discover_running_clients(excluded_pid),
         startup_items: discover_startup_items(),
+        native_installed_binaries: discover_native_installed_binaries(),
+        native_running_clients: discover_running_native_frpc(excluded_pid),
+        native_startup_items: discover_native_startup_items(),
     }
+}
+
+pub fn find_external_frpc_conflict(
+    config_path: &str,
+    excluded_pid: Option<u32>,
+) -> Option<ObservedNativeFrpcInfo> {
+    let expected = normalize_observed_config_path(config_path);
+    discover_running_native_frpc(excluded_pid)
+        .into_iter()
+        .find(|client| {
+            client
+                .config_path
+                .as_deref()
+                .map(normalize_observed_config_path)
+                .as_deref()
+                == Some(expected.as_str())
+        })
 }
 
 pub fn find_external_client_conflict(
@@ -53,6 +75,22 @@ fn discover_installed_binaries() -> Vec<ExternalBinaryInfo> {
         candidates.extend(binary_candidates_in_directory(&directory, "常用目录"));
     }
 
+    dedupe_binaries(candidates)
+}
+
+fn discover_native_installed_binaries() -> Vec<ExternalBinaryInfo> {
+    let mut candidates = Vec::new();
+    if let Some(path) = env::var_os("PATH") {
+        for directory in env::split_paths(&path) {
+            candidates.extend(native_binary_candidates_in_directory(&directory, "PATH"));
+        }
+    }
+    for directory in common_binary_directories() {
+        candidates.extend(native_binary_candidates_in_directory(
+            &directory,
+            "常用目录",
+        ));
+    }
     dedupe_binaries(candidates)
 }
 
@@ -89,6 +127,23 @@ fn binary_candidates_in_directory(directory: &Path, source: &str) -> Vec<Externa
         .collect()
 }
 
+fn native_binary_candidates_in_directory(
+    directory: &Path,
+    source: &str,
+) -> Vec<ExternalBinaryInfo> {
+    native_binary_filenames()
+        .into_iter()
+        .map(|name| directory.join(name))
+        .filter(|path| is_executable_file(path))
+        .map(|path| ExternalBinaryInfo {
+            name: binary_name_from_path(&path)
+                .unwrap_or_else(|| NATIVE_FRPC_BINARY_NAME.to_string()),
+            path: canonical_or_original_path(&path),
+            source: source.to_string(),
+        })
+        .collect()
+}
+
 fn client_binary_filenames() -> Vec<&'static str> {
     #[cfg(target_os = "windows")]
     {
@@ -98,6 +153,18 @@ fn client_binary_filenames() -> Vec<&'static str> {
     #[cfg(not(target_os = "windows"))]
     {
         CLIENT_BINARY_NAMES.to_vec()
+    }
+}
+
+fn native_binary_filenames() -> Vec<&'static str> {
+    #[cfg(target_os = "windows")]
+    {
+        vec!["frpc.exe"]
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec![NATIVE_FRPC_BINARY_NAME]
     }
 }
 
@@ -172,6 +239,40 @@ fn discover_running_clients(excluded_pid: Option<u32>) -> Vec<ObservedClientInfo
     clients
 }
 
+fn discover_running_native_frpc(excluded_pid: Option<u32>) -> Vec<ObservedNativeFrpcInfo> {
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing()
+            .with_cmd(UpdateKind::Always)
+            .with_exe(UpdateKind::Always),
+    );
+
+    let mut clients = system
+        .processes()
+        .values()
+        .filter_map(|process| {
+            let pid = process.pid().as_u32();
+            if Some(pid) == excluded_pid {
+                return None;
+            }
+            let command = process.cmd();
+            let binary_name = process_native_binary_name(process.exe(), process.name(), command)?;
+            observed_native_from_tokens(
+                pid,
+                binary_name,
+                process.exe().map(canonical_or_original_path),
+                command,
+                process.start_time(),
+                process.run_time(),
+            )
+        })
+        .collect::<Vec<_>>();
+    clients.sort_by_key(|client| client.pid);
+    clients
+}
+
 fn process_binary_name(
     executable: Option<&Path>,
     process_name: &OsStr,
@@ -192,6 +293,29 @@ fn process_binary_name(
                 .and_then(|command| command.to_str())
                 .and_then(binary_name_from_text)
                 .filter(|name| is_known_client_binary_name(name))
+        })
+}
+
+fn process_native_binary_name(
+    executable: Option<&Path>,
+    process_name: &OsStr,
+    command: &[OsString],
+) -> Option<String> {
+    executable
+        .and_then(binary_name_from_path)
+        .filter(|name| is_native_frpc_binary_name(name))
+        .or_else(|| {
+            process_name
+                .to_str()
+                .filter(|name| is_native_frpc_binary_name(name))
+                .map(str::to_string)
+        })
+        .or_else(|| {
+            command
+                .first()
+                .and_then(|command| command.to_str())
+                .and_then(binary_name_from_text)
+                .filter(|name| is_native_frpc_binary_name(name))
         })
 }
 
@@ -235,6 +359,56 @@ fn observed_client_from_safe_command(
     }
 }
 
+fn observed_native_from_tokens<T: AsRef<OsStr>>(
+    pid: u32,
+    binary_name: String,
+    binary_path: Option<String>,
+    tokens: &[T],
+    started_at_epoch_seconds: u64,
+    run_time_seconds: u64,
+) -> Option<ObservedNativeFrpcInfo> {
+    let config_path = native_config_path_from_tokens(tokens);
+    Some(ObservedNativeFrpcInfo {
+        pid,
+        binary_name,
+        binary_path,
+        config_path,
+        started_at_epoch_seconds: Some(started_at_epoch_seconds),
+        run_time_seconds: Some(run_time_seconds),
+    })
+}
+
+fn native_config_path_from_tokens<T: AsRef<OsStr>>(tokens: &[T]) -> Option<String> {
+    let values = tokens
+        .iter()
+        .filter_map(|token| token.as_ref().to_str())
+        .collect::<Vec<_>>();
+    let mut index = 1;
+    while index < values.len() {
+        let value = values[index];
+        if value == "-c" || value == "--config" {
+            return values
+                .get(index + 1)
+                .map(|path| normalize_observed_config_path(path));
+        }
+        if let Some(path) = value.strip_prefix("--config=") {
+            return Some(normalize_observed_config_path(path));
+        }
+        if let Some(path) = value.strip_prefix("-c=") {
+            return Some(normalize_observed_config_path(path));
+        }
+        index += 1;
+    }
+    None
+}
+
+fn normalize_observed_config_path(path: &str) -> String {
+    fs::canonicalize(path)
+        .unwrap_or_else(|_| PathBuf::from(path))
+        .to_string_lossy()
+        .to_string()
+}
+
 fn binary_name_from_path(path: &Path) -> Option<String> {
     path.file_name().and_then(OsStr::to_str).map(str::to_string)
 }
@@ -254,10 +428,32 @@ fn is_known_client_binary_name(value: &str) -> bool {
     CLIENT_BINARY_NAMES.iter().any(|known| name == *known) || name.starts_with("frp-panel-client-")
 }
 
+fn is_native_frpc_binary_name(value: &str) -> bool {
+    let name = Path::new(value)
+        .file_name()
+        .and_then(OsStr::to_str)
+        .unwrap_or(value)
+        .to_ascii_lowercase();
+    let name = name.strip_suffix(".exe").unwrap_or(&name);
+    name == NATIVE_FRPC_BINARY_NAME
+}
+
 fn discover_startup_items() -> Vec<StartupItemInfo> {
     #[cfg(target_os = "macos")]
     {
         return discover_macos_launch_agents();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Vec::new()
+    }
+}
+
+fn discover_native_startup_items() -> Vec<NativeStartupItemInfo> {
+    #[cfg(target_os = "macos")]
+    {
+        return discover_macos_native_launch_agents();
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -286,6 +482,32 @@ fn discover_macos_launch_agents() -> Vec<StartupItemInfo> {
         .filter_map(|path| {
             let value = plist::Value::from_file(&path).ok()?;
             launch_agent_item_from_value(&path, &value)
+        })
+        .collect::<Vec<_>>();
+    items.sort_by(|left, right| left.path.cmp(&right.path));
+    items
+}
+
+#[cfg(target_os = "macos")]
+fn discover_macos_native_launch_agents() -> Vec<NativeStartupItemInfo> {
+    let mut paths = HashSet::new();
+    for directory in macos_launch_agent_directories() {
+        let Ok(entries) = fs::read_dir(directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(OsStr::to_str) == Some("plist") {
+                paths.insert(path);
+            }
+        }
+    }
+
+    let mut items = paths
+        .into_iter()
+        .filter_map(|path| {
+            let value = plist::Value::from_file(&path).ok()?;
+            native_launch_agent_item_from_value(&path, &value)
         })
         .collect::<Vec<_>>();
     items.sort_by(|left, right| left.path.cmp(&right.path));
@@ -343,11 +565,57 @@ fn launch_agent_item_from_value(path: &Path, value: &plist::Value) -> Option<Sta
     })
 }
 
+#[cfg(target_os = "macos")]
+fn native_launch_agent_item_from_value(
+    path: &Path,
+    value: &plist::Value,
+) -> Option<NativeStartupItemInfo> {
+    let dictionary = value.as_dictionary()?;
+    let program = dictionary.get("Program").and_then(plist::Value::as_string);
+    let mut arguments = dictionary
+        .get("ProgramArguments")
+        .and_then(plist::Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(plist::Value::as_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    if let Some(program) = program {
+        if arguments.first().copied() != Some(program) {
+            arguments.insert(0, program);
+        }
+    }
+
+    arguments
+        .first()
+        .and_then(|argument| binary_name_from_text(argument))
+        .filter(|name| is_native_frpc_binary_name(name))?;
+    let config_path = native_config_path_from_tokens(&arguments);
+
+    Some(NativeStartupItemInfo {
+        label: dictionary
+            .get("Label")
+            .and_then(plist::Value::as_string)
+            .map(str::to_string)
+            .unwrap_or_else(|| path.display().to_string()),
+        path: path.display().to_string(),
+        kind: "macos-launch-agent".to_string(),
+        binary_path: arguments
+            .first()
+            .map(|argument| normalize_observed_config_path(argument)),
+        config_path,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         dedupe_binaries, find_client_id_conflict, is_known_client_binary_name,
-        observed_client_from_tokens, ExternalBinaryInfo, ObservedClientInfo,
+        native_config_path_from_tokens, observed_client_from_tokens, observed_native_from_tokens,
+        ExternalBinaryInfo, ObservedClientInfo,
     };
 
     #[test]
@@ -461,6 +729,39 @@ mod tests {
         ];
 
         assert_eq!(dedupe_binaries(binaries).len(), 1);
+    }
+
+    #[test]
+    fn observes_native_frpc_without_reading_configuration_contents() {
+        let tokens = ["frpc", "-c", "/tmp/frpc.toml"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        let observed = observed_native_from_tokens(
+            88,
+            "frpc".to_string(),
+            Some("/usr/local/bin/frpc".to_string()),
+            &tokens,
+            1_700_000_000,
+            16,
+        )
+        .unwrap();
+
+        assert_eq!(observed.pid, 88);
+        assert_eq!(observed.config_path.as_deref(), Some("/tmp/frpc.toml"));
+        assert!(!format!("{observed:?}").contains("auth.token"));
+    }
+
+    #[test]
+    fn parses_long_form_native_config_argument() {
+        let tokens = ["frpc", "--config=/tmp/native.toml"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            native_config_path_from_tokens(&tokens).as_deref(),
+            Some("/tmp/native.toml")
+        );
     }
 
     #[cfg(target_os = "macos")]

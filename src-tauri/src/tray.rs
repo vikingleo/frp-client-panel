@@ -4,9 +4,10 @@ use tauri::{
     AppHandle, Manager,
 };
 
-use crate::config::load_connection_inner;
-use crate::process::{start_client_inner, stop_client_inner};
+use crate::config::load_profile;
+use crate::process::{start_client_inner, start_native_profile_inner, stop_client_inner};
 use crate::runtime::AppRuntime;
+use crate::types::ClientMode;
 
 pub fn init_tray(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
@@ -39,10 +40,26 @@ pub fn init_tray(app: &AppHandle) -> tauri::Result<()> {
                     let Some(runtime) = app_handle.try_state::<AppRuntime>() else {
                         return;
                     };
-                    let Ok(Some(config)) = load_connection_inner(&app_handle) else {
+                    let Ok(Some(profile)) = load_profile(app_handle.clone(), None) else {
                         return;
                     };
-                    let _ = start_client_inner(app_handle.clone(), runtime.inner(), config).await;
+                    match profile.mode {
+                        ClientMode::PanelManaged => {
+                            if let Some(config) = profile.panel {
+                                let _ =
+                                    start_client_inner(app_handle.clone(), runtime.inner(), config)
+                                        .await;
+                            }
+                        }
+                        ClientMode::NativeFrpc => {
+                            let _ = start_native_profile_inner(
+                                app_handle.clone(),
+                                runtime.inner(),
+                                profile,
+                            )
+                            .await;
+                        }
+                    }
                 });
             }
             "disconnect" => {

@@ -6,7 +6,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 
-use crate::types::{LogEntry, RuntimeState, RuntimeStatus};
+use crate::types::{ClientMode, LogEntry, RuntimeState, RuntimeStatus};
 
 pub const LOG_LIMIT: usize = 800;
 
@@ -18,6 +18,10 @@ pub struct AppRuntime {
     pub started_at: Mutex<Option<Instant>>,
     pub logs: Mutex<VecDeque<LogEntry>>,
     pub generation: AtomicU64,
+    pub profile_id: Mutex<Option<String>>,
+    pub mode: Mutex<Option<ClientMode>>,
+    pub binary_name: Mutex<Option<String>>,
+    pub config_path: Mutex<Option<String>>,
 }
 
 impl Default for AppRuntime {
@@ -30,6 +34,10 @@ impl Default for AppRuntime {
             started_at: Mutex::new(None),
             logs: Mutex::new(VecDeque::new()),
             generation: AtomicU64::new(0),
+            profile_id: Mutex::new(None),
+            mode: Mutex::new(None),
+            binary_name: Mutex::new(None),
+            config_path: Mutex::new(None),
         }
     }
 }
@@ -67,6 +75,31 @@ impl AppRuntime {
             error,
             started_at_ms,
             sidecar_available,
+            profile_id: self.profile_id.lock().ok().and_then(|g| g.clone()),
+            mode: self.mode.lock().ok().and_then(|g| *g),
+            binary_name: self.binary_name.lock().ok().and_then(|g| g.clone()),
+            config_path: self.config_path.lock().ok().and_then(|g| g.clone()),
+        }
+    }
+
+    pub fn set_runtime_context(
+        &self,
+        profile_id: impl Into<String>,
+        mode: ClientMode,
+        binary_name: impl Into<String>,
+        config_path: Option<String>,
+    ) {
+        if let Ok(mut guard) = self.profile_id.lock() {
+            *guard = Some(profile_id.into());
+        }
+        if let Ok(mut guard) = self.mode.lock() {
+            *guard = Some(mode);
+        }
+        if let Ok(mut guard) = self.binary_name.lock() {
+            *guard = Some(binary_name.into());
+        }
+        if let Ok(mut guard) = self.config_path.lock() {
+            *guard = config_path;
         }
     }
 
