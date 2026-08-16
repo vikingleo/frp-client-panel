@@ -1,0 +1,10 @@
+serverAddr = "127.0.0.1"
+serverPort = 7000
+auth.token = "not-a-real-token"
+
+[[proxies]]
+name = "udp-example"
+type = "udp"
+localIP = "127.0.0.1"
+localPort = 5353
+remotePort = 5353

@@ -320,18 +320,25 @@ fn load_profile_document(app: &AppHandle) -> Result<StoredProfileDocument, Strin
     }
 
     // Migrate the original single-connection store without moving or duplicating the secret.
-    let document = match load_connection_inner(app)? {
+    let legacy_connection = load_connection_inner(app)?;
+    let document = profile_document_from_legacy_connection(legacy_connection.as_ref());
+    write_profile_document(app, &document)?;
+    Ok(document)
+}
+
+fn profile_document_from_legacy_connection(
+    config: Option<&ConnectionConfig>,
+) -> StoredProfileDocument {
+    match config {
         Some(config) => StoredProfileDocument {
             active_profile_id: "panel-default".into(),
-            profiles: vec![StoredProfile::from_panel(&config)],
+            profiles: vec![StoredProfile::from_panel(config)],
         },
         None => StoredProfileDocument {
             active_profile_id: String::new(),
             profiles: Vec::new(),
         },
-    };
-    write_profile_document(app, &document)?;
-    Ok(document)
+    }
 }
 
 fn upsert_panel_profile(app: &AppHandle, config: &ConnectionConfig) -> Result<(), String> {
@@ -590,8 +597,8 @@ mod tests {
     use std::cell::RefCell;
 
     use super::{
-        hydrate_connection_config, SecretStore, StoredConnectionConfig, StoredProfile,
-        KEYRING_ACCOUNT, KEYRING_SERVICE,
+        hydrate_connection_config, profile_document_from_legacy_connection, SecretStore,
+        StoredConnectionConfig, StoredProfile, KEYRING_ACCOUNT, KEYRING_SERVICE,
     };
     use crate::types::{ClientMode, ConnectionConfig};
 
@@ -709,5 +716,33 @@ mod tests {
         };
         let serialized = serde_json::to_string(&profile).unwrap();
         assert!(!serialized.contains("must-not-write-profile-json"));
+    }
+
+    #[test]
+    fn migrates_legacy_connection_to_the_default_panel_profile_without_serializing_secret() {
+        let legacy = ConnectionConfig {
+            client_id: "user.c.mac".into(),
+            client_secret: "must-stay-in-keychain".into(),
+            api_url: "https://panel.example.com".into(),
+            rpc_url: "wss://panel.example.com/rpc".into(),
+            auto_connect: true,
+            launch_at_login: false,
+            allow_insecure_tls: false,
+        };
+
+        let document = profile_document_from_legacy_connection(Some(&legacy));
+
+        assert_eq!(document.active_profile_id, "panel-default");
+        assert_eq!(document.profiles.len(), 1);
+        let profile = &document.profiles[0];
+        assert_eq!(profile.id, "panel-default");
+        assert_eq!(profile.mode, ClientMode::PanelManaged);
+        assert_eq!(
+            profile.panel.as_ref().map(|panel| panel.client_id.as_str()),
+            Some("user.c.mac")
+        );
+        assert!(!serde_json::to_string(&document)
+            .unwrap()
+            .contains("must-stay-in-keychain"));
     }
 }

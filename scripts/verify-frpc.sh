@@ -62,6 +62,21 @@ if [[ "${host_target}" == "${target_triple}" ]]; then
     exit 1
   }
   printf '%s\n' "${version_output}"
+
+  fixture_directory="${project_root}/src-tauri/tests/fixtures"
+  for fixture_name in \
+    frpc-valid.toml \
+    frpc-generated-tcp.toml \
+    frpc-generated-udp.toml \
+    frpc-generated-http.toml \
+    frpc-generated-https.toml; do
+    fixture_path="${fixture_directory}/${fixture_name}"
+    [[ -f "${fixture_path}" ]] || {
+      printf 'Native frpc fixture is missing: %s\n' "${fixture_path}" >&2
+      exit 1
+    }
+    "${binary_path}" verify -c "${fixture_path}"
+  done
 else
   printf 'Cross-target binary validated without execution: %s\n' "${target_triple}"
 fi

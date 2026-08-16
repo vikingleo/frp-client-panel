@@ -436,6 +436,9 @@ fn is_native_frpc_binary_name(value: &str) -> bool {
         .to_ascii_lowercase();
     let name = name.strip_suffix(".exe").unwrap_or(&name);
     name == NATIVE_FRPC_BINARY_NAME
+        || ["frpc-aarch64-apple-darwin", "frpc-x86_64-apple-darwin"]
+            .iter()
+            .any(|sidecar_name| name == *sidecar_name)
 }
 
 fn discover_startup_items() -> Vec<StartupItemInfo> {
@@ -614,8 +617,8 @@ fn native_launch_agent_item_from_value(
 mod tests {
     use super::{
         dedupe_binaries, find_client_id_conflict, is_known_client_binary_name,
-        native_config_path_from_tokens, observed_client_from_tokens, observed_native_from_tokens,
-        ExternalBinaryInfo, ObservedClientInfo,
+        is_native_frpc_binary_name, native_config_path_from_tokens, observed_client_from_tokens,
+        observed_native_from_tokens, ExternalBinaryInfo, ObservedClientInfo,
     };
 
     #[test]
@@ -764,6 +767,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn recognizes_the_tauri_native_sidecar_file_names() {
+        assert!(is_native_frpc_binary_name("frpc"));
+        assert!(is_native_frpc_binary_name("frpc-aarch64-apple-darwin"));
+        assert!(is_native_frpc_binary_name("frpc-x86_64-apple-darwin"));
+        assert!(!is_native_frpc_binary_name("frpc-not-a-supported-sidecar"));
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn parses_macos_launch_agent_without_exposing_secret() {
@@ -797,6 +808,87 @@ mod tests {
         assert_eq!(item.client_id.as_deref(), Some("user.c.macos"));
         assert!(item.secret_argument_present);
         assert!(!format!("{item:?}").contains("external-secret-must-not-leak"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn parses_native_macos_launch_agent_without_opening_the_config_file() {
+        use std::path::Path;
+
+        use plist::{Dictionary, Value};
+
+        let config_path = "/private/var/empty-directory/does-not-need-to-exist.toml";
+        let mut dictionary = Dictionary::new();
+        dictionary.insert(
+            "Label".to_string(),
+            Value::String("frpc.external".to_string()),
+        );
+        dictionary.insert(
+            "ProgramArguments".to_string(),
+            Value::Array(vec![
+                Value::String("/usr/local/bin/frpc".to_string()),
+                Value::String("--config".to_string()),
+                Value::String(config_path.to_string()),
+            ]),
+        );
+
+        let item = super::native_launch_agent_item_from_value(
+            Path::new("/Users/example/Library/LaunchAgents/frpc.external.plist"),
+            &Value::Dictionary(dictionary),
+        )
+        .unwrap();
+
+        assert_eq!(item.binary_path.as_deref(), Some("/usr/local/bin/frpc"));
+        assert_eq!(item.config_path.as_deref(), Some(config_path));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn discovers_a_running_native_frpc_process_by_its_config_argument() {
+        use std::{
+            path::PathBuf,
+            process::{Command, Stdio},
+            thread,
+            time::Duration,
+        };
+
+        let target = if cfg!(target_arch = "aarch64") {
+            "aarch64-apple-darwin"
+        } else {
+            "x86_64-apple-darwin"
+        };
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let binary = manifest.join("binaries").join(format!("frpc-{target}"));
+        let config_path = manifest
+            .join("tests/fixtures/frpc-valid.toml")
+            .canonicalize()
+            .expect("test config should exist")
+            .to_string_lossy()
+            .to_string();
+        let mut child = Command::new(&binary)
+            .args(["-c", &config_path])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("test frpc should start");
+        let pid = child.id();
+
+        let observed = (0..30).find_map(|_| {
+            let found = super::discover_running_native_frpc(None)
+                .into_iter()
+                .find(|client| client.pid == pid);
+            if found.is_none() {
+                thread::sleep(Duration::from_millis(100));
+            }
+            found
+        });
+
+        let _ = child.kill();
+        let _ = child.wait();
+
+        let observed = observed.expect("running frpc should be discovered");
+        assert_eq!(observed.config_path.as_deref(), Some(config_path.as_str()));
+        assert_eq!(observed.binary_name, format!("frpc-{target}"));
     }
 }
 

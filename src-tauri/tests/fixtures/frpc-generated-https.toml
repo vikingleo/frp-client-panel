@@ -1,0 +1,10 @@
+serverAddr = "127.0.0.1"
+serverPort = 7000
+auth.token = "not-a-real-token"
+
+[[proxies]]
+name = "https-example"
+type = "https"
+localIP = "127.0.0.1"
+localPort = 8443
+customDomains = ["secure.example.com"]
