@@ -375,7 +375,7 @@ fn redact_native_line(line: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{client_args, redact_native_line};
+    use super::{classify_client_log, client_args, redact_native_line, ClientLogState};
     use crate::types::ConnectionConfig;
 
     #[test]
@@ -409,6 +409,47 @@ mod tests {
         assert_eq!(
             redact_native_line("login to server success"),
             "login to server success"
+        );
+    }
+
+    #[test]
+    fn transient_network_errors_are_marked_as_reconnecting() {
+        let lines = [
+            "error reading from server: read tcp 172.20.10.14:63607->116.10.204.148:1580: read: can't assign requested address",
+            "rpc error: code = Unavailable desc = error reading from server",
+            "wsgrpc read message error",
+            "cannot receive, sleep 3s and return",
+            "cannot pull client config",
+        ];
+
+        for line in lines {
+            assert_eq!(classify_client_log(line), ClientLogState::Reconnecting);
+        }
+    }
+
+    #[test]
+    fn successful_registration_restores_running_state() {
+        assert_eq!(
+            classify_client_log(
+                "client get server register envent success, clientID: vikingleo.c.macos"
+            ),
+            ClientLogState::Running
+        );
+    }
+
+    #[test]
+    fn fatal_process_errors_remain_errors() {
+        assert_eq!(
+            classify_client_log("panic: failed to initialize client"),
+            ClientLogState::Error
+        );
+        assert_eq!(
+            classify_client_log("client get server register envent success"),
+            ClientLogState::Running
+        );
+        assert_eq!(
+            classify_client_log("client [id] config is empty, wait for server init"),
+            ClientLogState::Ignore
         );
     }
 }
@@ -469,16 +510,36 @@ fn handle_output(app: &AppHandle, runtime: &AppRuntime, stream: &str, bytes: &[u
     }
 }
 
-fn update_state_from_log(app: &AppHandle, runtime: &AppRuntime, line: &str) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClientLogState {
+    Running,
+    Reconnecting,
+    Error,
+    Ignore,
+}
+
+fn classify_client_log(line: &str) -> ClientLogState {
     let lower = line.to_lowercase();
     if lower.contains("pull client config success")
         || lower.contains("start to run client")
         || lower.contains("run client")
         || lower.contains("client started")
+        || lower.contains("client get server register envent success")
+        || lower.contains("client get server register event success")
     {
-        runtime.set_state(RuntimeState::Running, None);
-        emit_status(app, runtime, runtime_sidecar_available(app, runtime));
-        return;
+        return ClientLogState::Running;
+    }
+
+    // 网络切换后，Go 可能会短暂使用已失效的本地地址。上游客户端会自动重连，
+    // 这里保持“重连中”状态，避免把仍存活的 sidecar 误报为进程错误。
+    if lower.contains("can't assign requested address")
+        || lower.contains("rpc error: code = unavailable")
+        || lower.contains("wsgrpc read message error")
+        || lower.contains("wsgrpc error")
+        || lower.contains("cannot receive, sleep")
+        || lower.contains("cannot pull client config")
+    {
+        return ClientLogState::Reconnecting;
     }
 
     let is_error = lower.contains("fatal")
@@ -488,9 +549,22 @@ fn update_state_from_log(app: &AppHandle, runtime: &AppRuntime, line: &str) {
         || lower.contains(" error")
         || lower.starts_with("error");
     if is_error {
-        runtime.set_state(RuntimeState::Error, Some(line.to_string()));
-        emit_status(app, runtime, runtime_sidecar_available(app, runtime));
+        ClientLogState::Error
+    } else {
+        ClientLogState::Ignore
     }
+}
+
+fn update_state_from_log(app: &AppHandle, runtime: &AppRuntime, line: &str) {
+    match classify_client_log(line) {
+        ClientLogState::Running => runtime.set_state(RuntimeState::Running, None),
+        ClientLogState::Reconnecting => {
+            runtime.set_state(RuntimeState::Starting, Some(line.to_string()))
+        }
+        ClientLogState::Error => runtime.set_state(RuntimeState::Error, Some(line.to_string())),
+        ClientLogState::Ignore => return,
+    }
+    emit_status(app, runtime, runtime_sidecar_available(app, runtime));
 }
 
 fn mask_secret(line: &str, secret: &str) -> String {

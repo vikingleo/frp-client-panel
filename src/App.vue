@@ -174,13 +174,18 @@ const hasExternalConflict = computed(() => (isNative.value ? Boolean(currentNati
 const displayState = computed<DisplayState>(() => (!status.value.running && monitoredExternal.value ? "external" : status.value.state));
 const currentState = computed(() => {
   const native = isNative.value;
+  const reconnecting = status.value.state === "starting" && Boolean(status.value.error);
   const entries: Record<DisplayState, { label: string; description: string; tone: string }> = {
     stopped: {
       label: native ? "frpc 未运行" : "未连接",
       description: native ? "尚未启动 App 托管的原生 frpc" : "尚未启动 frp-panel Client",
       tone: "neutral",
     },
-    starting: { label: native ? "正在启动 frpc" : "正在连接", description: "正在准备运行引擎", tone: "warning" },
+    starting: {
+      label: reconnecting ? "网络重连中" : native ? "正在启动 frpc" : "正在连接",
+      description: reconnecting ? "连接暂时中断，客户端正在自动恢复" : "正在准备运行引擎",
+      tone: "warning",
+    },
     running: {
       label: native ? "frpc 运行中" : "已连接",
       description: native ? "App 正在管理官方 frpc 进程" : "frp-panel-client 正在运行",
@@ -203,7 +208,8 @@ const uptimeLabel = computed(() => {
 });
 const filteredLogs = computed(() => (logFilter.value === "all" ? logs.value : logs.value.filter((entry) => entry.stream === logFilter.value)));
 const recentLogs = computed(() => logs.value.slice(-6).reverse());
-const lastError = computed(() => status.value.error || [...logs.value].reverse().find((entry) => entry.stream === "stderr")?.line || "");
+// frp-panel 的正常日志也会写入 stderr，只展示后端明确判定的运行错误。
+const lastError = computed(() => status.value.error || "");
 const logText = computed(() => logs.value.map((entry) => `[${formatTime(entry.ts_ms)}] ${entry.stream.toUpperCase()}  ${entry.line}`).join("\n"));
 
 function setNotice(kind: NoticeKind, message: string) {
